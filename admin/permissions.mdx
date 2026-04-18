@@ -1,0 +1,100 @@
+---
+title: "Group permissions and page access rules"
+description: "Assign granular permissions to Wiki.js groups. Use page rules with path matching and locale filters to allow or deny access to specific content."
+---
+
+Access control in Wiki.js operates at two levels: site-wide permissions that govern what actions a group member can perform, and page rules that restrict or grant access to specific paths or content tags. Both are configured per group, and every user inherits the combined permissions of all groups they belong to.
+
+## Permissions
+
+Permissions are string identifiers assigned to a group. A user who belongs to multiple groups holds the union of all permissions across those groups.
+
+| Permission | Description |
+|---|---|
+| `read:pages` | View published pages |
+| `write:pages` | Create and edit pages |
+| `manage:pages` | Move and rename pages |
+| `delete:pages` | Delete pages |
+| `read:source` | View the raw source markup of a page |
+| `read:history` | View page revision history |
+| `write:users` | Create new user accounts |
+| `manage:users` | Edit and delete user accounts |
+| `write:groups` | Create new groups |
+| `manage:groups` | Edit and delete groups, assign users |
+| `read:comments` | View comments on pages |
+| `write:comments` | Post comments on pages |
+| `manage:comments` | Edit and delete any comment |
+| `manage:system` | Full administration access (all settings, all data) |
+| `manage:api` | Create, view, and revoke API keys |
+| `read:assets` | View and download uploaded files and images |
+| `write:assets` | Upload new files and images |
+| `manage:assets` | Delete and rename uploaded assets |
+
+<Warning>
+  `manage:system` grants unrestricted access to all administration panels and overrides every other permission check. Assign it only to accounts that genuinely require full administrative control.
+</Warning>
+
+<Note>
+  The built-in **Administrators** group implicitly holds all permissions and cannot be restricted by page rules. The built-in **Guests** group controls what unauthenticated visitors can see.
+</Note>
+
+## Page rules
+
+Page rules let you grant or deny a specific set of permissions on a subset of pages, identified by path pattern, locale, or tag. Rules in a group are evaluated in order; the first rule whose pattern matches the requested path applies.
+
+### Page rule fields
+
+| Field | Type | Description |
+|---|---|---|
+| `match` | enum | How the `path` value is compared to the page path |
+| `path` | string | The value to match against (path segment, full path, regex, or tag name) |
+| `locales` | string[] | Restrict the rule to specific locales; empty means all locales |
+| `roles` | string[] | Permission strings this rule grants or denies |
+| `deny` | boolean | When `true`, the rule denies the listed roles instead of granting them |
+
+### Match types
+
+The `match` field accepts one of five values defined by the `PageRuleMatch` enum:
+
+| Match type | Behaviour |
+|---|---|
+| `START` | Applies to any page whose path **begins with** the given value |
+| `EXACT` | Applies only to a page whose path **exactly equals** the given value |
+| `END` | Applies to any page whose path **ends with** the given value |
+| `REGEX` | Applies to any page whose path matches the given regular expression |
+| `TAG` | Applies to any page that has the given **tag** assigned to it |
+
+### Example page rule
+
+The following rule denies the `read:pages` permission to all pages under the `/internal/` path for users in the group, effectively making that subtree invisible to them regardless of site-wide permissions:
+
+```json
+{
+  "match": "START",
+  "path": "/internal/",
+  "locales": [],
+  "roles": ["read:pages"],
+  "deny": true
+}
+```
+
+To allow a group to read a specific confidential page while a broader deny rule covers the parent path, add a second rule above the deny rule using `EXACT` match with `deny: false`.
+
+<Tip>
+  Order matters. Place more specific rules (e.g. `EXACT`) before broader ones (e.g. `START`) within the same group so that narrower matches are evaluated first.
+</Tip>
+
+### Locale filtering
+
+When you specify one or more locale codes in the `locales` array, the rule only activates for pages in those locales. Leaving `locales` empty applies the rule to all languages. This is useful when your wiki serves multiple language audiences and you need different access policies per locale.
+
+## Effective permissions
+
+A user's effective permission set for a given page is determined by:
+
+1. Collecting all groups the user belongs to.
+2. Merging the `permissions` arrays from each group.
+3. Evaluating page rules from each group in order against the current page path and locale.
+4. Any matching deny rule removes the listed roles from the effective set for that page.
+
+This means a deny rule in one group can override a permission granted by another group the same user belongs to.

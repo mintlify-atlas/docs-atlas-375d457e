@@ -1,0 +1,90 @@
+---
+title: "Authentication Providers and Login Settings"
+description: "Configure login methods for Wiki.js. Enable local accounts, LDAP, OAuth2, SAML, and 21 other authentication strategies with per-strategy settings."
+---
+
+Wiki.js supports 21 authentication strategies out of the box, from a simple local username-and-password form to enterprise providers like LDAP, SAML, and OIDC. You can enable multiple strategies simultaneously so that users can choose their preferred login method. All authentication settings are managed under **Administration → Authentication**.
+
+## Available providers
+
+<CardGroup cols={3}>
+  <Card title="Auth0" icon="lock" />
+  <Card title="Azure Active Directory" icon="building" />
+  <Card title="CAS" icon="key" />
+  <Card title="Discord" icon="discord" />
+  <Card title="Dropbox" icon="box" />
+  <Card title="Facebook" icon="facebook" />
+  <Card title="Firebase" icon="fire" />
+  <Card title="GitHub" icon="github" />
+  <Card title="GitLab" icon="git-alt" />
+  <Card title="Google" icon="google" />
+  <Card title="Keycloak" icon="shield" />
+  <Card title="LDAP / Active Directory" icon="server" />
+  <Card title="Local" icon="user" />
+  <Card title="Microsoft" icon="windows" />
+  <Card title="OAuth2 (Generic)" icon="plug" />
+  <Card title="OpenID Connect" icon="id-card" />
+  <Card title="Okta" icon="circle-check" />
+  <Card title="Rocket.Chat" icon="comments" />
+  <Card title="SAML 2.0" icon="shield-halved" />
+  <Card title="Slack" icon="slack" />
+  <Card title="Twitch" icon="twitch" />
+</CardGroup>
+
+Each strategy is an independently configurable module. You activate it, supply the required credentials or endpoint URLs, and it appears as a login option on the sign-in page.
+
+## Enabling a strategy
+
+Every active strategy has the following shared settings:
+
+- **Display name** — the label shown on the login button.
+- **Order** — controls the position of this provider on the login page relative to others.
+- **Enabled** — toggle to activate or deactivate the strategy without losing its configuration.
+- **Config** — provider-specific key-value settings (client ID, client secret, server URL, etc.).
+
+You can have multiple instances of generic strategies like OAuth2 or OIDC active at the same time, each pointing to a different identity provider.
+
+## Local strategy settings
+
+The built-in local strategy authenticates users against accounts stored directly in Wiki.js. In addition to the shared settings above, it exposes three registration controls:
+
+- **Self-registration** — when enabled, visitors can create their own accounts from the login page using the `register` mutation. When disabled, only administrators can create accounts.
+- **Domain whitelist** — a list of email domains (e.g. `example.com`) that are allowed to self-register. If the list is empty, any email domain is accepted. This field is only meaningful when self-registration is on.
+- **Auto-enroll groups** — a list of group IDs that every self-registered user is automatically added to. Use this to ensure new sign-ups land in the correct group with the right permissions without manual intervention.
+
+<Warning>
+  If you enable self-registration without a domain whitelist, anyone with a valid email address can create an account on your wiki. Restrict the domain list or use a private authentication provider if your content is not intended for the public.
+</Warning>
+
+## JWT settings
+
+Wiki.js issues JSON Web Tokens after a successful login. Three site-level settings govern token behaviour, found under **Administration → Site → Authentication**:
+
+| Setting | Config field | Description |
+|---|---|---|
+| JWT audience | `authJwtAudience` | The `aud` claim value embedded in every token; typically your site's domain |
+| Token expiration | `authJwtExpiration` | How long a token remains valid after issue (e.g. `30m`, `2h`, `7d`) |
+| Renewable period | `authJwtRenewablePeriod` | Window during which an expiring token can be silently renewed (e.g. `14d`) |
+
+## Two-factor authentication
+
+TFA can be enforced at the site level or enabled per user account.
+
+- **Site-wide enforcement** (`authEnforce2FA`) — when enabled, every user must set up and use a TOTP authenticator app before they can access the wiki. Users who have not yet configured TFA are guided through the setup flow on their next login.
+- **Per-user TFA** — administrators can enable or disable TFA on individual accounts from **Administration → Users** without affecting other users.
+
+<Note>
+  Only authentication strategies where `providerIs2FACapable` is `true` support the TFA enforcement flow. The local strategy supports TFA; most OAuth and SAML providers manage second factors themselves.
+</Note>
+
+## Auto-login and login page options
+
+Three site-level flags affect how the login page behaves:
+
+- **Auto-login** (`authAutoLogin`) — immediately redirects unauthenticated visitors to the first enabled authentication provider instead of showing the login page. Useful when there is only one provider.
+- **Hide local login** (`authHideLocal`) — hides the local username-and-password form from the login page while keeping the local strategy active for API access. Use this when all users authenticate through a social or enterprise provider but you still need local admin access.
+- **Login background** (`authLoginBgUrl`) — URL of a custom background image for the login page.
+
+<Tip>
+  If you hide the local login form, you can still reach it by appending `?all=1` to the login URL. Keep this in mind if you ever need to log in with a local administrator account while auto-login or a hide-local flag is active.
+</Tip>

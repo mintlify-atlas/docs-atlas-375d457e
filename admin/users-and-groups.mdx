@@ -1,0 +1,98 @@
+---
+title: "Managing users and groups in Wiki.js"
+description: "Create and manage user accounts in Wiki.js. Organize users into groups to control content access, assign roles, and handle registration."
+---
+
+Wiki.js stores every person who can interact with your site as a user record, and controls what they can see and do through group membership. Each user belongs to one or more groups, and each group carries a set of permissions and page rules. Understanding this relationship is the foundation of access control in Wiki.js.
+
+## User accounts
+
+Every user record holds a core set of profile fields alongside authentication and state metadata.
+
+| Field | Type | Description |
+|---|---|---|
+| `name` | string | Display name shown across the interface |
+| `email` | string | Primary identifier; must be unique |
+| `providerKey` | string | Key of the authentication strategy that created the account (e.g. `local`, `github`) |
+| `providerName` | string | Human-readable name of the authentication provider |
+| `providerId` | string | External identifier returned by the provider (OAuth/SAML) |
+| `isActive` | boolean | Whether the account can log in |
+| `isVerified` | boolean | Whether the email address has been confirmed |
+| `tfaIsActive` | boolean | Whether two-factor authentication is enabled for this account |
+| `location` | string | Optional location field on the user profile |
+| `jobTitle` | string | Optional job title field on the user profile |
+| `timezone` | string | User's preferred timezone for timestamps |
+| `dateFormat` | string | User's preferred date display format |
+| `appearance` | string | UI theme preference (`default`, `dark`, `light`) |
+| `lastLoginAt` | date | Timestamp of the most recent successful login |
+| `groups` | array | List of groups the user belongs to |
+
+### Admin actions on users
+
+Administrators with the `manage:users` or `manage:system` permission can perform the following actions from **Administration → Users**:
+
+- **Create** — add a new account by providing an email, display name, password, authentication provider, and initial group membership. You can also require the user to change their password on first login and send a welcome email.
+- **Update** — change name, email, password, groups, location, job title, timezone, date format, or appearance.
+- **Delete** — permanently remove a user. You must specify a replacement user ID so that any content owned by the deleted account is reassigned.
+- **Verify** — manually mark an email address as verified without requiring the user to click a confirmation link.
+- **Activate / Deactivate** — enable or disable login access without deleting the record.
+- **Enable / Disable TFA** — force two-factor authentication on or off for a specific account.
+- **Reset password** — send a password reset link to the user's email address.
+
+<Note>
+  The `isSystem` flag marks the built-in Guest and Administrator accounts. System accounts cannot be deleted.
+</Note>
+
+## Groups
+
+Groups bundle permissions and page rules together so you can manage access for many users at once. A user can belong to multiple groups, and their effective permissions are the union of all groups they are in.
+
+### Built-in groups
+
+Wiki.js ships with two groups that cannot be deleted:
+
+- **Administrators** — members have full access to all content and all administration features. This group implicitly holds every permission.
+- **Guests** — the identity used for unauthenticated visitors. Permissions granted to this group apply to anyone who is not logged in.
+
+### Group fields
+
+| Field | Description |
+|---|---|
+| `name` | Display name for the group |
+| `permissions` | List of permission strings granted to all members |
+| `pageRules` | Ordered list of path-based access rules |
+| `redirectOnLogin` | Path to redirect members to immediately after they log in |
+
+### Creating a group
+
+<Steps>
+  <Step title="Open the Groups administration panel">
+    Navigate to **Administration → Groups** and click **Create Group**.
+  </Step>
+  <Step title="Set the group name">
+    Enter a descriptive name that reflects the role or audience (for example, `Editors` or `Engineering`).
+  </Step>
+  <Step title="Assign permissions">
+    Select each permission string the group should hold. Permissions control which actions members can perform site-wide. See [Group Permissions and Page Access Rules](/admin/permissions) for the full list.
+  </Step>
+  <Step title="Add page rules">
+    Define one or more page rules to allow or deny access to specific paths or tags. Rules are evaluated in order; the first matching rule wins.
+  </Step>
+  <Step title="Set a redirect path (optional)">
+    Enter a path in **Redirect on Login** if members of this group should land on a specific page after authenticating.
+  </Step>
+  <Step title="Save and assign users">
+    Click **Save** to create the group. Then open each user record you want to add and include the new group in their group list, or use the group detail view to assign users directly.
+  </Step>
+</Steps>
+
+### Assigning users to groups
+
+You can assign a user to a group from either direction:
+
+- **From the user record** — open **Administration → Users**, select a user, and edit the **Groups** field.
+- **From the group record** — open **Administration → Groups**, select a group, and use the **Users** tab to search for and add users.
+
+<Tip>
+  When you create a user account through the API or admin panel, you must supply at least one group ID. Placing new users directly into the correct group at creation time avoids a separate assignment step.
+</Tip>

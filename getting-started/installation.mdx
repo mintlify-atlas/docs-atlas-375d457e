@@ -1,0 +1,226 @@
+---
+title: "Install Wiki.js with Docker or Node.js"
+description: "Step-by-step instructions to install Wiki.js using Docker, Docker Compose, or Node.js directly. Includes database setup and first-run wizard."
+---
+
+Wiki.js supports three installation paths: a single Docker container, Docker Compose (recommended for most teams), or a direct Node.js installation. All three methods end the same way — a setup wizard served on port 3000 that walks you through creating your administrator account and completing first-run configuration.
+
+Choose the method that fits your infrastructure. Docker Compose is the fastest path if you do not already have a database running.
+
+## Choose your installation method
+
+<CodeGroup>
+
+```bash Docker
+docker run -d \
+  -e DB_TYPE=postgres \
+  -e DB_HOST=db \
+  -e DB_PORT=5432 \
+  -e DB_USER=wikijs \
+  -e DB_PASS=wikijsrocks \
+  -e DB_NAME=wiki \
+  -p 3000:3000 \
+  --name wiki \
+  requarks/wiki:2
+```
+
+```yaml docker-compose.yml
+version: "3"
+services:
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: wiki
+      POSTGRES_PASSWORD: wikijsrocks
+      POSTGRES_USER: wikijs
+    volumes:
+      - db-data:/var/lib/postgresql/data
+  wiki:
+    image: requarks/wiki:2
+    depends_on:
+      - db
+    environment:
+      DB_TYPE: postgres
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USER: wikijs
+      DB_PASS: wikijsrocks
+      DB_NAME: wiki
+    ports:
+      - "3000:3000"
+volumes:
+  db-data:
+```
+
+</CodeGroup>
+
+---
+
+## Docker
+
+<Steps>
+  <Step title="Pull the image and start a container">
+    Run the following command, replacing the database environment variables with the credentials for your existing PostgreSQL instance:
+
+    ```bash
+    docker run -d \
+      -e DB_TYPE=postgres \
+      -e DB_HOST=db \
+      -e DB_PORT=5432 \
+      -e DB_USER=wikijs \
+      -e DB_PASS=wikijsrocks \
+      -e DB_NAME=wiki \
+      -p 3000:3000 \
+      --name wiki \
+      requarks/wiki:2
+    ```
+
+    The `-p 3000:3000` flag maps the container's port to your host. Adjust the left-hand side if port 3000 is already in use on your machine.
+  </Step>
+  <Step title="Open the setup wizard">
+    Once the container is running, open your browser and navigate to:
+
+    ```
+    http://YOUR-SERVER-IP:3000
+    ```
+
+    The setup wizard starts automatically on the first launch. If the wizard does not appear, check the container logs with `docker logs wiki`.
+  </Step>
+  <Step title="Complete setup and log in">
+    Fill in the site URL, administrator email, and password. Click **Install** to finalize. Wiki.js will restart and redirect you to the login page.
+  </Step>
+</Steps>
+
+---
+
+## Docker Compose
+
+Docker Compose starts both Wiki.js and a PostgreSQL database together, with the database persisted to a named volume.
+
+<Steps>
+  <Step title="Create a docker-compose.yml file">
+    Save the following to a file named `docker-compose.yml` in a new directory:
+
+    ```yaml docker-compose.yml
+    version: "3"
+    services:
+      db:
+        image: postgres:15-alpine
+        environment:
+          POSTGRES_DB: wiki
+          POSTGRES_PASSWORD: wikijsrocks
+          POSTGRES_USER: wikijs
+        volumes:
+          - db-data:/var/lib/postgresql/data
+      wiki:
+        image: requarks/wiki:2
+        depends_on:
+          - db
+        environment:
+          DB_TYPE: postgres
+          DB_HOST: db
+          DB_PORT: 5432
+          DB_USER: wikijs
+          DB_PASS: wikijsrocks
+          DB_NAME: wiki
+        ports:
+          - "3000:3000"
+    volumes:
+      db-data:
+    ```
+
+    <Warning>
+      Change the `POSTGRES_PASSWORD` and `DB_PASS` values to a strong, unique password before deploying to any network-accessible server.
+    </Warning>
+  </Step>
+  <Step title="Start the stack">
+    From the directory containing your `docker-compose.yml`, run:
+
+    ```bash
+    docker compose up -d
+    ```
+
+    Docker pulls the images on first run. The `depends_on` directive ensures the database is ready before Wiki.js starts.
+  </Step>
+  <Step title="Open the setup wizard">
+    Navigate to `http://YOUR-SERVER-IP:3000` in your browser. The first-run wizard appears automatically.
+  </Step>
+  <Step title="Complete setup and log in">
+    Enter your site URL, administrator credentials, and click **Install**. Wiki.js restarts and takes you to the login screen.
+  </Step>
+</Steps>
+
+---
+
+## Node.js (bare metal)
+
+Use this method when you want to run Wiki.js directly on a server without Docker, or when you need to customize the runtime environment.
+
+<Steps>
+  <Step title="Download the latest release">
+    Download the most recent stable release archive from the [Wiki.js GitHub releases page](https://github.com/Requarks/wiki/releases). Look for the file named `wiki-js.tar.gz`.
+  </Step>
+  <Step title="Extract the archive">
+    Create a directory for Wiki.js and extract the archive into it:
+
+    ```bash
+    mkdir -p /opt/wikijs
+    tar -xzf wiki-js.tar.gz -C /opt/wikijs
+    cd /opt/wikijs
+    ```
+  </Step>
+  <Step title="Create your config.yml">
+    Copy the sample configuration file and open it for editing:
+
+    ```bash
+    cp config.sample.yml config.yml
+    ```
+
+    <Tip>
+      `config.sample.yml` contains every available option with inline comments. It is the canonical reference for all configuration keys.
+    </Tip>
+
+    At a minimum, set the `db` section to point at your database. For example, for PostgreSQL:
+
+    ```yaml config.yml
+    port: 3000
+
+    db:
+      type: postgres
+      host: localhost
+      port: 5432
+      user: wikijs
+      pass: yourpassword
+      db: wiki
+      ssl: false
+    ```
+
+    See the [configuration reference](/getting-started/configuration) for all available options.
+  </Step>
+  <Step title="Start Wiki.js">
+    Run the server using either of the following commands:
+
+    ```bash
+    node server
+    ```
+
+    or
+
+    ```bash
+    npm start
+    ```
+
+    On first launch you will see a log message directing you to the setup wizard:
+
+    ```
+    Browse to http://YOUR-SERVER-IP:3000/ to complete setup!
+    ```
+  </Step>
+  <Step title="Open the setup wizard and complete setup">
+    Navigate to `http://YOUR-SERVER-IP:3000` in your browser. Enter your site URL and administrator credentials, then click **Install**. Wiki.js writes its configuration to the database and restarts automatically.
+  </Step>
+</Steps>
+
+<Note>
+For production Node.js deployments, run Wiki.js under a process manager such as **PM2** or **systemd** so that it restarts automatically after crashes or reboots.
+</Note>

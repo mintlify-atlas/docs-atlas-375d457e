@@ -1,0 +1,151 @@
+---
+title: "Page comments and ratings in Wiki.js"
+description: "Enable reader comments and star ratings on Wiki.js pages. Integrates with comment providers and lets readers engage with content directly."
+---
+
+Wiki.js supports optional commenting on pages, allowing readers to ask questions, provide feedback, or discuss content directly below the page. Comments are powered by a configurable comment provider — you can use the built-in system or connect a third-party service. Ratings (thumbs up/down) are also available as a way for readers to signal whether a page was helpful.
+
+Both features are site-wide settings. When enabled, they appear on every page that the reader has permission to view.
+
+## Enabling comments
+
+Comments are enabled from the administration panel under **Administration → Comments**. Select and configure a comment provider, then toggle it on. The change takes effect immediately across all pages.
+
+<Note>
+  Comments are a site-wide feature. There is no per-page toggle — once enabled, the comment section appears on all pages accessible to the reader.
+</Note>
+
+## Comment providers
+
+Wiki.js supports four comment providers. Only one provider can be active at a time.
+
+<AccordionGroup>
+  <Accordion title="Default (built-in)">
+    Wiki.js ships with a built-in comment system that stores comments directly in your wiki database. It supports:
+
+    - Threaded replies (`replyTo` a parent comment ID)
+    - Guest comments (with optional name and email)
+    - **Akismet spam filtering** — enter your Akismet API key to automatically flag spam comments. Leave the field empty to disable spam filtering.
+    - **Post delay** — set a minimum number of seconds between comments per account (default: 30 seconds). All guest users share a single rate limit bucket.
+
+    The built-in provider requires no external accounts or infrastructure.
+  </Accordion>
+  <Accordion title="Disqus">
+    [Disqus](https://disqus.com/) is a popular hosted commenting platform. To connect it:
+
+    1. Create a Disqus account and register your site.
+    2. Copy your **Shortname** (unique site identifier) from the Disqus admin panel.
+    3. Enter the shortname in the Wiki.js Disqus provider configuration.
+
+    Disqus loads its widget client-side, so comments are managed entirely through your Disqus account.
+  </Accordion>
+  <Accordion title="Commento">
+    [Commento](https://commento.io/) is a privacy-focused commenting platform. You can use either the cloud-hosted version at `https://cdn.commento.io` (default) or a self-hosted Commento instance.
+
+    Set the **Instance URL** to your Commento server URL (without a trailing slash). Leave the default value to use the cloud-hosted service.
+  </Accordion>
+  <Accordion title="Artalk">
+    [Artalk](https://artalk.js.org/) is a lightweight self-hosted comment system. To connect it:
+
+    1. Deploy an Artalk backend instance.
+    2. Enter the **Artalk Backend URL** — the publicly accessible URL of your instance, starting with `http://` or `https://`, without a trailing slash (e.g. `https://artalk.example.com`).
+    3. Optionally set a **Site Name** matching the site configured in your Artalk backend. Leave empty to use the Artalk default site.
+  </Accordion>
+</AccordionGroup>
+
+## Permissions
+
+Comment visibility and interaction are governed by group permissions. The relevant permission flags are:
+
+| Permission | What it allows |
+|-----------|----------------|
+| `read:comments` | View comments on pages |
+| `write:comments` | Post new comments and replies |
+| `manage:comments` | Edit and delete any comment |
+
+Assign these to user groups from **Administration → Groups**. A user who lacks `read:comments` will not see the comment section even if comments are globally enabled.
+
+<Tip>
+  Grant `write:comments` only to authenticated user groups if you want to prevent anonymous spam. The built-in provider's post delay and Akismet integration provide additional protection for wikis that allow guest comments.
+</Tip>
+
+## Comment structure
+
+Each comment has the following fields:
+
+| Field | Description |
+|-------|-------------|
+| `id` | Unique comment identifier |
+| `content` | Raw comment content (visible to users with `write:comments` or `manage:comments`) |
+| `render` | Rendered HTML version of the comment |
+| `authorId` | ID of the commenting user |
+| `authorName` | Display name of the commenter |
+| `authorEmail` | Email address (visible to admins only) |
+| `authorIP` | IP address of the commenter (visible to admins only) |
+| `createdAt` | Timestamp when the comment was posted |
+| `updatedAt` | Timestamp of the last edit |
+
+## Querying comments via the API
+
+List comments for a specific page (requires `read:comments` or `manage:system`):
+
+```graphql
+query {
+  comments {
+    list(locale: "en", path: "docs/getting-started") {
+      id
+      authorName
+      render
+      createdAt
+    }
+  }
+}
+```
+
+Post a new comment (requires `write:comments`):
+
+```graphql
+mutation {
+  comments {
+    create(
+      pageId: 42
+      content: "This guide was very helpful, thank you!"
+    ) {
+      responseResult {
+        succeeded
+        message
+      }
+      id
+    }
+  }
+}
+```
+
+Reply to an existing comment by passing the parent comment's `id` as `replyTo`:
+
+```graphql
+mutation {
+  comments {
+    create(
+      pageId: 42
+      replyTo: 7
+      content: "Agreed, especially the configuration section."
+    ) {
+      responseResult {
+        succeeded
+      }
+      id
+    }
+  }
+}
+```
+
+<Note>
+  The `create` mutation is rate-limited to one comment per 15 seconds per account to prevent abuse. This limit is in addition to any post delay configured in the built-in provider settings.
+</Note>
+
+## Ratings
+
+Page ratings let readers signal whether a page was useful. The rating widget appears alongside the comment section when the feature is enabled. Ratings data is stored per-page and can be used to surface high-quality or underperforming content in your admin reporting.
+
+Ratings, like comments, are a site-wide setting and do not require any external provider configuration.

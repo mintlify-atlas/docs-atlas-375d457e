@@ -1,0 +1,145 @@
+---
+title: "Assets GraphQL API Reference"
+description: "List, organize, rename, and delete assets in Wiki.js via GraphQL. Manage file folders and retrieve metadata for images and binary files."
+---
+
+The Assets API lets you query and manage uploaded files in Wiki.js. You can list assets in a folder, browse the folder hierarchy, create new folders, rename or delete assets, and flush temporary uploads. File uploads themselves are handled via a multipart HTTP POST, not a GraphQL mutation.
+
+<Note>
+Reading assets requires `read:assets` or `manage:system`. Writing and deleting requires `write:assets` or `manage:assets`.
+</Note>
+
+## Queries
+
+### `list` — List assets in a folder
+
+```graphql
+query {
+  assets {
+    list(folderId: 0, kind: ALL) {
+      id
+      filename
+      ext
+      kind
+      mime
+      fileSize
+      createdAt
+      updatedAt
+      folder { id slug name }
+      author { id name }
+    }
+  }
+}
+```
+
+<ParamField path="folderId" type="Int" required>
+  ID of the folder to list. Use `0` for the root folder.
+</ParamField>
+<ParamField path="kind" type="AssetKind" required>
+  Filter by asset type: `IMAGE`, `BINARY`, or `ALL`.
+</ParamField>
+
+### `folders` — List subfolders
+
+```graphql
+query {
+  assets {
+    folders(parentFolderId: 0) {
+      id
+      slug
+      name
+    }
+  }
+}
+```
+
+Use `parentFolderId: 0` to list root-level folders.
+
+---
+
+## Mutations
+
+### `createFolder` — Create a new folder
+
+```graphql
+mutation {
+  assets {
+    createFolder(parentFolderId: 0, slug: "team-photos", name: "Team Photos") {
+      responseResult { succeeded errorCode message }
+    }
+  }
+}
+```
+
+<ParamField path="parentFolderId" type="Int" required>
+  Parent folder ID. Use `0` for root.
+</ParamField>
+<ParamField path="slug" type="String" required>
+  URL-safe folder identifier (lowercase, no spaces).
+</ParamField>
+<ParamField path="name" type="String">
+  Human-readable folder name.
+</ParamField>
+
+### `renameAsset` — Rename a file
+
+```graphql
+mutation {
+  assets {
+    renameAsset(id: 12, filename: "new-filename.png") {
+      responseResult { succeeded errorCode message }
+    }
+  }
+}
+```
+
+### `deleteAsset` — Delete a file
+
+```graphql
+mutation {
+  assets {
+    deleteAsset(id: 12) {
+      responseResult { succeeded errorCode message }
+    }
+  }
+}
+```
+
+### `flushTempUploads` — Remove temporary uploads
+
+```graphql
+mutation {
+  assets {
+    flushTempUploads {
+      responseResult { succeeded errorCode message }
+    }
+  }
+}
+```
+
+Clears any uploaded files that were not assigned to a page. Requires `manage:system`.
+
+---
+
+## Uploading files
+
+File uploads are not handled by GraphQL. Upload files by sending a `multipart/form-data` POST request to the Wiki.js upload endpoint with your authorization token.
+
+```bash
+curl -X POST https://wiki.example.com/u \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -F "mediaUpload=@/path/to/image.png" \
+  -F 'mediaUpload={"folderId":0}'
+```
+
+After uploading, use `assets { list(folderId: 0, kind: ALL) }` to find the asset ID.
+
+---
+
+## Asset types
+
+| `AssetKind` | Description |
+|-------------|-------------|
+| `IMAGE` | Image files (PNG, JPG, GIF, SVG, WebP, etc.) |
+| `BINARY` | Non-image files (PDF, ZIP, DOCX, etc.) |
+| `ALL` | All files regardless of type |

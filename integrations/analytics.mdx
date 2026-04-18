@@ -1,0 +1,111 @@
+---
+title: "Analytics Integrations for Wiki.js"
+description: "Track page views and visitor behavior on your Wiki.js instance. Connect Google Analytics, Fathom, Plausible, Matomo, and other analytics providers."
+---
+
+Wiki.js can inject an analytics tracking script into every page it serves. This lets you understand how visitors navigate your wiki, which pages are most viewed, and where traffic originates — without any changes to your page content or templates. Tracking runs entirely in the visitor's browser using the provider's standard client-side library.
+
+<Note>
+  Only one analytics provider can be active at a time. Enabling a second provider automatically disables the previously active one.
+</Note>
+
+## Available providers
+
+| Provider | Key | Description |
+|---|---|---|
+| Google Analytics | `google` | Tracks and reports website traffic. Requires a GA4 property tracking ID (format: `G-XXXXXXXXXX`). |
+| Google Tag Manager | `gtm` | Tag management container that can load Google Analytics and other tags. Requires a GTM container ID (format: `GTM-XXXXXXX`). |
+| Matomo | `matomo` | Self-hosted or cloud analytics platform with full data ownership and user privacy protection. |
+| Plausible Analytics | `plausible` | Lightweight, open-source, privacy-friendly alternative to Google Analytics. Supports self-hosted instances. |
+| Fathom | `fathom` | Simple website stats without tracking or storing personal data. Requires your Fathom server host and site ID. |
+| Azure Application Insights | `azureinsights` | Microsoft's Application Performance Management service. Requires an instrumentation key from the Azure portal. |
+| New Relic Browser | `newrelic` | Deep visibility into user interactions. Requires license key, application ID, and beacon endpoints. |
+| Countly | `countly` | Customer journey analytics for web and mobile applications. Requires an app key and server URL. |
+| Elasticsearch APM RUM | `elasticapm` | Real User Monitoring that captures user interactions and reports them to an Elastic APM server. |
+| FullStory | `fullstory` | Digital experience analytics with session replay, heat maps, and funnels. Requires an organization ID. |
+| Hotjar | `hotjar` | Visual analytics with heatmaps and session recordings. Requires a numeric site ID. |
+| StatCounter | `statcounter` | Website traffic analytics. Requires a project ID and security token from the StatCounter code snippet. |
+| Baidu Tongji | `baidutongji` | Web analytics service by Baidu, primarily for audiences in China. |
+| Umami Analytics v1 | `umami` | Privacy-focused open-source analytics. Requires a website ID and your Umami server URL. |
+| Umami Analytics v2 | `umami2` | Updated integration for Umami v2. Same configuration fields as v1. |
+| Yandex Metrica | `yandex` | Comprehensive visitor analytics with mouse movement tracking. Requires a Yandex tag number. |
+
+## Enabling an analytics provider
+
+<Steps>
+  <Step title="Open analytics settings">
+    Navigate to **Administration → Analytics** in the admin sidebar.
+  </Step>
+  <Step title="Select a provider">
+    Find the provider you want to use and toggle it on.
+  </Step>
+  <Step title="Enter your tracking ID or key">
+    Each provider requires at least one identifier — a tracking ID, site ID, app key, or instrumentation key. Refer to the table above and your provider's dashboard for the exact value.
+  </Step>
+  <Step title="Save changes">
+    Click **Apply Changes**. The tracking script will be injected into all subsequent page loads automatically.
+  </Step>
+</Steps>
+
+## What is tracked
+
+Analytics providers receive data about page views in your wiki. The tracking script fires on each page navigation, passing the current URL and page title to the provider. The specific data collected and retained depends entirely on the provider you choose and their privacy policy — Wiki.js itself does not store or process analytics data.
+
+<Warning>
+  Some analytics providers (Google Analytics, Hotjar, FullStory, New Relic Browser) collect detailed behavioral data including session recordings and user identifiers. Review your chosen provider's data processing terms and ensure compliance with applicable privacy regulations (GDPR, CCPA, etc.) before enabling them on a public wiki.
+</Warning>
+
+## Privacy-friendly options
+
+If you want analytics without tracking personal data, consider these providers:
+
+<CardGroup cols={2}>
+  <Card title="Plausible Analytics" icon="chart-simple">
+    Open-source, cookieless, and GDPR-compliant by design. Can be self-hosted or used as a cloud service.
+  </Card>
+  <Card title="Fathom" icon="chart-bar">
+    Does not track or store personal data. Simple page view counts and referrer data only.
+  </Card>
+  <Card title="Umami" icon="chart-line">
+    Open-source and self-hostable. Collects no personal data and requires no cookie consent banner.
+  </Card>
+  <Card title="Matomo" icon="database">
+    Self-hosted option that keeps all data on your own servers. Configurable privacy settings including IP anonymization.
+  </Card>
+</CardGroup>
+
+## AnalyticsProvider fields (GraphQL)
+
+You can query the list of available providers and their configuration through the GraphQL API:
+
+```graphql
+query {
+  analytics {
+    providers(isEnabled: true) {
+      key
+      title
+      isEnabled
+      isAvailable
+      description
+      website
+      config {
+        key
+        value
+      }
+    }
+  }
+}
+```
+
+Each `AnalyticsProvider` object exposes:
+
+| Field | Type | Description |
+|---|---|---|
+| `key` | `String` | Unique provider identifier (e.g. `google`, `plausible`). |
+| `title` | `String` | Display name of the provider. |
+| `isEnabled` | `Boolean` | Whether this provider is currently active. |
+| `isAvailable` | `Boolean` | Whether the provider is available in this installation. |
+| `description` | `String` | Short description of the provider. |
+| `website` | `String` | Link to the provider's official website. |
+| `props` | `[String]` | Configuration property names as JSON strings. |
+| `config` | `[KeyValuePair]` | Current configuration key-value pairs. |

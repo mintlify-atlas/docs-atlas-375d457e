@@ -1,0 +1,124 @@
+---
+title: "Deploy Wiki.js with Docker and Docker Compose"
+description: "Run Wiki.js in a container using Docker or Docker Compose with PostgreSQL. Includes environment variables, volume mounts, and port configuration."
+---
+
+Wiki.js publishes an official image on Docker Hub (`requarks/wiki:2`) that bundles the Node.js server and all static assets. You supply database credentials through environment variables, map port 3000, and the container is ready to serve traffic. The sections below cover a standalone `docker run` command for quick evaluation and a full Docker Compose stack for production use with PostgreSQL.
+
+## Prerequisites
+
+- Docker Engine 20.10 or later installed on your host
+- A PostgreSQL 9.5 or later instance, either managed externally or started as part of the Compose stack
+- Port 3000 available on the host (or any host port you choose to map)
+
+## Environment variables
+
+Wiki.js reads database configuration from the following environment variables at startup. All six are required when connecting to PostgreSQL.
+
+| Variable  | Description                                     | Example        |
+| --------- | ----------------------------------------------- | -------------- |
+| `DB_TYPE` | Database engine. Use `postgres` for PostgreSQL. | `postgres`     |
+| `DB_HOST` | Hostname or IP of the database server.          | `db`           |
+| `DB_PORT` | TCP port the database listens on.               | `5432`         |
+| `DB_USER` | Database user.                                  | `wikijs`       |
+| `DB_PASS` | Password for the database user.                 | `wikijsrocks`  |
+| `DB_NAME` | Name of the database to connect to.             | `wiki`         |
+
+## Run with Docker
+
+Use this command when you already have a PostgreSQL server running and want to start Wiki.js as a single container. Replace the variable values with your actual credentials and hostname.
+
+```bash
+docker run -d \
+  -e DB_TYPE=postgres \
+  -e DB_HOST=db \
+  -e DB_PORT=5432 \
+  -e DB_USER=wikijs \
+  -e DB_PASS=wikijsrocks \
+  -e DB_NAME=wiki \
+  -p 3000:3000 \
+  --name wiki \
+  requarks/wiki:2
+```
+
+<Warning>
+The example credentials above (`wikijsrocks`) are placeholders from the upstream sample configuration. Change `DB_PASS` and `POSTGRES_PASSWORD` to strong, unique passwords before running in any environment beyond local testing.
+</Warning>
+
+## Run with Docker Compose
+
+The Compose file below starts both Wiki.js and a PostgreSQL 15 database as a single application stack. A named volume (`db-data`) persists the database across container restarts.
+
+```yaml docker-compose.yml
+version: "3"
+services:
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: wiki
+      POSTGRES_PASSWORD: wikijsrocks
+      POSTGRES_USER: wikijs
+    volumes:
+      - db-data:/var/lib/postgresql/data
+  wiki:
+    image: requarks/wiki:2
+    depends_on:
+      - db
+    environment:
+      DB_TYPE: postgres
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USER: wikijs
+      DB_PASS: wikijsrocks
+      DB_NAME: wiki
+    ports:
+      - "3000:3000"
+volumes:
+  db-data:
+```
+
+Start the stack:
+
+```bash
+docker compose up -d
+```
+
+Stop the stack:
+
+```bash
+docker compose down
+```
+
+To remove all data including the database volume, add the `-v` flag:
+
+```bash
+docker compose down -v
+```
+
+## Volume mounts
+
+The `db-data` named volume handles database persistence automatically. If you need to persist Wiki.js's own cache and temporary upload directory, mount the container path `/wiki/data` to a host path or named volume:
+
+```yaml
+wiki:
+  image: requarks/wiki:2
+  volumes:
+    - wiki-data:/wiki/data
+```
+
+This corresponds to the `dataPath` setting in `config.yml` (default: `./data`).
+
+## Port configuration
+
+Wiki.js listens on port `3000` by default, as set in `config.sample.yml`. The Compose example maps host port `3000` to container port `3000`. To use a different host port, change the left side of the mapping:
+
+```yaml
+ports:
+  - "8080:3000"
+```
+
+## First-time setup
+
+<Note>
+After the containers start, open `http://localhost:3000` in your browser to run the setup wizard. The wizard lets you create the administrator account and configure the site name, locale, and initial authentication strategy. You only need to complete it once.
+</Note>

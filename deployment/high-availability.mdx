@@ -1,0 +1,133 @@
+---
+title: "High-Availability Deployment for Wiki.js"
+description: "Run multiple Wiki.js instances against a shared PostgreSQL database for zero-downtime and load-balanced deployments. Requires HA mode enabled."
+---
+
+Wiki.js supports running multiple concurrent instances connected to the same database. In high-availability (HA) mode, instances use PostgreSQL's built-in publish/subscribe mechanism (`pg-pubsub`) to broadcast cache invalidation events and configuration changes to one another. This allows you to place several Wiki.js containers or processes behind a load balancer and serve traffic without a single point of failure.
+
+## Requirements
+
+Before enabling HA mode, confirm that your deployment meets these requirements:
+
+- **PostgreSQL is mandatory.** HA mode relies on PostgreSQL pub/sub for inter-instance messaging. MySQL, MariaDB, MS SQL Server, and SQLite do not support this feature.
+- All instances must connect to the **same PostgreSQL database** with the same credentials.
+- All instances must use identical `config.yml` settings (port, data path, log level, and so on).
+- A load balancer must sit in front of the instances to distribute incoming requests.
+
+<Warning>
+Setting `ha: true` in `config.yml` while using a non-PostgreSQL database engine will cause startup errors. Verify that `db.type` is set to `postgres` before enabling HA mode.
+</Warning>
+
+## Enabling HA mode
+
+Open `config.yml` on every instance and set the `ha` flag to `true`:
+
+```yaml config.yml
+ha: true
+```
+
+By default, this setting is `false`. You must restart each Wiki.js process or container after changing it.
+
+## How inter-instance communication works
+
+When one instance modifies a cached resource or updates a global configuration value, it publishes a message to a PostgreSQL channel using the `pg-pubsub` library (listed as a direct dependency in `package.json`). All other connected instances subscribe to the same channel and invalidate or refresh their local caches in response. This keeps the in-memory state consistent across the cluster without requiring a separate message broker such as Redis.
+
+## Load balancer configuration
+
+Place a load balancer in front of your Wiki.js instances. Both nginx upstream and HAProxy are well-suited for this.
+
+<Tabs>
+  <Tab title="nginx upstream">
+
+```nginx /etc/nginx/sites-available/wiki-ha
+upstream wikijs {
+    server 10.0.0.1:3000;
+    server 10.0.0.2:3000;
+    server 10.0.0.3:3000;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name wiki.example.com;
+
+    ssl_certificate     /path/to/cert.pem;
+    ssl_certificate_key /path/to/key.pem;
+
+    location / {
+        proxy_pass http://wikijs;
+        proxy_set_header Host              $host;
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade    $http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+}
+```
+
+  </Tab>
+  <Tab title="HAProxy">
+
+```haproxy /etc/haproxy/haproxy.cfg
+frontend wikijs_front
+    bind *:443 ssl crt /path/to/cert.pem
+    default_backend wikijs_back
+
+backend wikijs_back
+    balance roundrobin
+    option http-server-close
+    option forwardfor
+    server wiki1 10.0.0.1:3000 check
+    server wiki2 10.0.0.2:3000 check
+    server wiki3 10.0.0.3:3000 check
+```
+
+  </Tab>
+</Tabs>
+
+## Sticky sessions
+
+Sticky sessions are **not required**. After a user authenticates, Wiki.js issues a JWT token stored in the browser. Subsequent requests carry the token in the `Authorization` header and can be handled by any instance in the cluster without server-side session state. Round-robin and least-connections load balancing strategies both work correctly.
+
+## Shared configuration
+
+All instances in the cluster must read from an identical `config.yml`. In containerised deployments, mount the same configuration file as a read-only volume in every container:
+
+```yaml docker-compose.yml (excerpt)
+services:
+  wiki1:
+    image: requarks/wiki:2
+    volumes:
+      - ./config.yml:/wiki/config.yml:ro
+    environment:
+      DB_TYPE: postgres
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USER: wikijs
+      DB_PASS: wikijsrocks
+      DB_NAME: wiki
+    ports:
+      - "3001:3000"
+  wiki2:
+    image: requarks/wiki:2
+    volumes:
+      - ./config.yml:/wiki/config.yml:ro
+    environment:
+      DB_TYPE: postgres
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USER: wikijs
+      DB_PASS: wikijsrocks
+      DB_NAME: wiki
+    ports:
+      - "3002:3000"
+```
+
+The `config.yml` mounted above must contain `ha: true`.
+
+## Scaling considerations
+
+- The PostgreSQL server becomes the shared state layer for the cluster. Ensure it is sized appropriately for the combined connection pool of all instances. The default pool range is 2–10 connections per instance (configurable via `pool.min` and `pool.max` in `config.yml`).
+- The `dataPath` directory (default `./data`) is used for temporary file uploads and cache. In multi-instance deployments, either mount a shared network filesystem at that path or configure an object storage backend in Wiki.js's storage settings so that uploaded assets are accessible from all instances.

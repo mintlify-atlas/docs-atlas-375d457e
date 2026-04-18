@@ -1,0 +1,151 @@
+---
+title: "Upgrading Wiki.js to a New Version"
+description: "Safely upgrade your Wiki.js installation. Back up your database, pull the latest image or release, and let the automatic migrator run on startup."
+---
+
+Wiki.js runs any pending database migrations automatically when the server process starts. This means upgrading is generally straightforward: back up your database, replace the application files or container image, and restart. The sections below walk through the process for Docker, Docker Compose, and bare-metal Node.js installations.
+
+<Warning>
+Always back up your database before upgrading. Although migrations are designed to be safe, a backup gives you a recovery path if anything goes wrong. Do not skip this step.
+</Warning>
+
+<Tip>
+Test the upgrade on a staging environment that mirrors production before applying it to live data. This lets you catch migration issues or breaking changes without affecting your users.
+</Tip>
+
+## Check the changelog
+
+Before upgrading, review the release notes on the [GitHub releases page](https://github.com/Requarks/wiki/releases) for the version you are targeting. Pay attention to any breaking changes, new required configuration keys, or manual steps listed in the release notes.
+
+## Back up your database
+
+<Steps>
+  <Step title="Create a database dump">
+    For PostgreSQL, run `pg_dump` to create a backup of your Wiki.js database:
+
+    ```bash
+    pg_dump -U wikijs -h localhost -F c -f wiki_backup_$(date +%Y%m%d).dump wiki
+    ```
+
+    Store the dump file in a safe location outside the database server.
+  </Step>
+  <Step title="Verify the backup">
+    Confirm the dump file is non-empty and can be listed:
+
+    ```bash
+    pg_restore --list wiki_backup_$(date +%Y%m%d).dump | head -20
+    ```
+  </Step>
+</Steps>
+
+## Upgrade with Docker
+
+<Steps>
+  <Step title="Pull the latest image">
+    Pull the updated `requarks/wiki:2` image from Docker Hub:
+
+    ```bash
+    docker pull requarks/wiki:2
+    ```
+  </Step>
+  <Step title="Stop and remove the existing container">
+    ```bash
+    docker stop wiki
+    docker rm wiki
+    ```
+  </Step>
+  <Step title="Start a new container">
+    Start a new container with the same options you used originally. The server detects any pending migrations and runs them automatically during startup:
+
+    ```bash
+    docker run -d \
+      -e DB_TYPE=postgres \
+      -e DB_HOST=db \
+      -e DB_PORT=5432 \
+      -e DB_USER=wikijs \
+      -e DB_PASS=wikijsrocks \
+      -e DB_NAME=wiki \
+      -p 3000:3000 \
+      --name wiki \
+      requarks/wiki:2
+    ```
+  </Step>
+  <Step title="Check the startup logs">
+    Watch the container logs to confirm migrations completed and the server is ready:
+
+    ```bash
+    docker logs -f wiki
+    ```
+
+    Look for a line indicating the server is listening on port 3000.
+  </Step>
+</Steps>
+
+## Upgrade with Docker Compose
+
+<Steps>
+  <Step title="Pull updated images">
+    ```bash
+    docker compose pull
+    ```
+  </Step>
+  <Step title="Restart the stack">
+    ```bash
+    docker compose up -d
+    ```
+
+    Compose recreates containers whose images have changed. Wiki.js runs migrations on startup before accepting requests.
+  </Step>
+  <Step title="Verify the upgrade">
+    ```bash
+    docker compose logs -f wiki
+    ```
+  </Step>
+</Steps>
+
+## Upgrade a Node.js installation
+
+<Steps>
+  <Step title="Download the new release">
+    Download the release archive for the new version from the [GitHub releases page](https://github.com/Requarks/wiki/releases). Each release includes a pre-built `wiki-js.tar.gz` archive.
+
+    ```bash
+    wget https://github.com/Requarks/wiki/releases/download/VERSION/wiki-js.tar.gz
+    ```
+
+    Replace `VERSION` with the target release tag (for example, `2.5.300`).
+  </Step>
+  <Step title="Stop the running instance">
+    ```bash
+    systemctl stop wiki
+    # or: pm2 stop wiki
+    # or: kill $(cat wiki.pid)
+    ```
+  </Step>
+  <Step title="Extract the new release">
+    Extract the archive into your Wiki.js installation directory, overwriting existing application files. Preserve your `config.yml`:
+
+    ```bash
+    tar -xzf wiki-js.tar.gz -C /path/to/wiki
+    ```
+  </Step>
+  <Step title="Restore your config.yml">
+    If the extraction overwrote `config.yml`, restore it from your backup. Do not use the new sample configuration file—it will overwrite your existing settings.
+  </Step>
+  <Step title="Start Wiki.js">
+    ```bash
+    systemctl start wiki
+    # or: node server
+    ```
+
+    The server runs pending database migrations automatically on startup.
+  </Step>
+</Steps>
+
+## Automatic database migrations
+
+Wiki.js uses [Knex.js](https://knexjs.org/) to manage schema migrations. On every startup, the server compares the current database schema version against the migrations bundled in the release. Any migrations that have not yet been applied are run in order before the HTTP server begins accepting connections. You do not need to run migrations manually.
+
+<Note>
+If a migration fails, Wiki.js will log the error and exit rather than starting with an inconsistent schema. Check the logs for the specific error message, restore your database backup if necessary, and open an issue on GitHub with the migration output if the problem is not covered by existing documentation.
+</Note>

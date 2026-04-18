@@ -1,0 +1,118 @@
+---
+title: "Full-text search in Wiki.js"
+description: "Search across all wiki pages with Wiki.js full-text search. Supports PostgreSQL built-in, Elasticsearch, Algolia, Azure, Solr, and more."
+---
+
+Wiki.js includes a configurable full-text search system. When a reader types a query into the search bar, Wiki.js queries the active search engine and returns matching pages ranked by relevance, along with query suggestions. Only one search engine can be active at a time — you choose which one fits your infrastructure in the administration panel under **Search Engine**.
+
+## How search results work
+
+Every search response includes:
+
+- **Results** — a list of matching pages, each with a `title`, `description`, `path`, and `locale`.
+- **Suggestions** — alternative query terms returned alongside results, useful for catching typos or near-matches.
+- **Total hits** — the total number of matching documents, even if only a subset is returned.
+
+Search is scoped to pages the authenticated user has permission to read. The query can optionally be filtered by `path` prefix or `locale`.
+
+## Available search engines
+
+<CardGroup cols={2}>
+  <Card title="Database — Basic" icon="database">
+    The default engine. Works with any database (PostgreSQL, MySQL, MariaDB, SQLite, MSSQL). No additional infrastructure required. Use this for small wikis or quick setups.
+  </Card>
+  <Card title="Database — PostgreSQL" icon="database">
+    An advanced engine that uses PostgreSQL's native `tsvector` full-text search. Significantly better search quality than the basic engine. Recommended for most production installs that already use PostgreSQL.
+  </Card>
+  <Card title="Elasticsearch" icon="magnifying-glass">
+    Connects to an Elasticsearch cluster. Supports versions 6.x, 7.x, and 8.x. Configure TLS, index name, token analyzer, and optional cluster sniffing. Best for large wikis or teams that already operate Elasticsearch.
+  </Card>
+  <Card title="Algolia" icon="bolt">
+    Uses Algolia's hosted search-as-a-service. Requires an Algolia account, Application ID, Admin API Key, and index name. Delivers fast, typo-tolerant search with zero infrastructure overhead.
+  </Card>
+  <Card title="AWS CloudSearch" icon="cloud">
+    Amazon's managed search service. Requires an AWS account, CloudSearch domain, document endpoint, region, and IAM credentials. Supports multilingual content analysis across 30+ languages.
+  </Card>
+  <Card title="Azure Search" icon="cloud">
+    Microsoft Azure's AI-powered search service. Requires an Azure Search service name, Admin API Key, and index name.
+  </Card>
+  <Card title="Manticore Search" icon="magnifying-glass">
+    A high-performance open-source search engine with SQL and JSON support. Listed as coming soon (`isAvailable: false`) in the current release.
+  </Card>
+  <Card title="Solr" icon="magnifying-glass">
+    Apache Solr, built on Apache Lucene. Configure host, port, core name, and HTTP protocol. Listed as coming soon in the current release.
+  </Card>
+</CardGroup>
+
+<Note>
+  **Sphinx Search** is also listed as a planned engine. It is not yet available in the current release.
+</Note>
+
+## Choosing a search engine
+
+| Engine | Best for | Extra infrastructure |
+|--------|----------|---------------------|
+| Database — Basic | Small wikis, quick setup, non-PostgreSQL databases | None |
+| Database — PostgreSQL | Most production installs on PostgreSQL | None (uses existing DB) |
+| Elasticsearch | Large wikis, advanced relevance tuning | Elasticsearch cluster |
+| Algolia | Teams wanting hosted search with no ops overhead | Algolia account |
+| AWS CloudSearch | AWS-native deployments | AWS CloudSearch domain |
+| Azure Search | Azure-native deployments | Azure Search service |
+
+## Configuring a search engine
+
+1. Go to **Administration → Search Engine**.
+2. Select the engine you want to activate and toggle it on.
+3. Fill in the engine-specific configuration fields (API keys, hostnames, index names, etc.).
+4. Click **Apply** to save. Wiki.js switches to the new engine immediately.
+
+<Warning>
+  Only one engine can be enabled at a time. Enabling a new engine disables the previously active one. Always rebuild the search index after switching engines.
+</Warning>
+
+## Rebuilding the search index
+
+If search results are missing or stale — for example, after switching engines or importing pages in bulk — you can trigger a full index rebuild from the admin panel:
+
+1. Go to **Administration → Search Engine**.
+2. Click **Rebuild Index**.
+
+You can also trigger this via the GraphQL API (requires `manage:system`):
+
+```graphql
+mutation {
+  search {
+    rebuildIndex {
+      responseResult {
+        succeeded
+        message
+      }
+    }
+  }
+}
+```
+
+The rebuild re-indexes all existing pages. For large wikis this may take several minutes.
+
+## PostgreSQL engine: dictionary language
+
+When using the **Database — PostgreSQL** engine, you can configure the text search dictionary language to match your wiki's primary language. Supported languages include:
+
+`simple`, `danish`, `dutch`, `english`, `finnish`, `french`, `german`, `hungarian`, `italian`, `norwegian`, `portuguese`, `romanian`, `russian`, `spanish`, `swedish`, `turkish`
+
+The default is `english`. Using the correct language improves stemming — for example, the English dictionary treats "running" and "run" as the same stem.
+
+## Elasticsearch engine: version and TLS
+
+The Elasticsearch engine supports versions **6.x**, **7.x** (default), and **8.x**. Configure the following options to match your cluster:
+
+| Option | Description |
+|--------|-------------|
+| Elasticsearch Version | Must match your cluster version |
+| Host(s) | Comma-separated list including scheme, host, and port (e.g. `https://user:pass@es1.example.com:9200`) |
+| Verify TLS Certificate | Enable or disable TLS certificate verification |
+| TLS Certificate Path | Absolute path to a custom TLS certificate on the server |
+| Index Name | Name of the index to create (default: `wiki`) |
+| Analyzer | Token analyzer (default: `simple`) |
+| Sniff on start | Auto-detect cluster nodes on first connection |
+| Sniff interval | Interval in seconds to refresh the node list (0 = disabled) |

@@ -1,0 +1,83 @@
+---
+title: "Security settings and best practices"
+description: "Harden your Wiki.js installation with HSTS, CSP, SRI, iframe controls, open redirect protection, upload scanning, and two-factor authentication."
+---
+
+Wiki.js exposes a dedicated set of security controls under **Administration → Site → Security**. These settings map directly to HTTP security headers, upload constraints, and authentication policies stored in the site configuration. Reviewing and enabling the appropriate options is an important step when deploying a production wiki.
+
+## HTTP strict transport security (HSTS)
+
+HSTS instructs browsers to connect exclusively over HTTPS for a specified duration, preventing protocol-downgrade attacks.
+
+| Setting | Config field | Description |
+|---|---|---|
+| Enable HSTS | `securityHSTS` | Adds the `Strict-Transport-Security` header to every response |
+| HSTS duration | `securityHSTSDuration` | Max-age in seconds (e.g. `31536000` for one year) |
+
+<Warning>
+  Only enable HSTS after you have confirmed that your site is fully accessible over HTTPS. Once a browser receives the header, it will refuse all HTTP connections for the entire duration of the max-age value. An incorrectly configured TLS setup after enabling HSTS can lock users out until the max-age expires.
+</Warning>
+
+## Content security policy (CSP)
+
+CSP restricts the origins from which the browser may load scripts, styles, images, and other resources, reducing the impact of cross-site scripting attacks.
+
+| Setting | Config field | Description |
+|---|---|---|
+| Enable CSP | `securityCSP` | Adds the `Content-Security-Policy` header to every response |
+| Custom directives | `securityCSPDirectives` | Additional CSP directive string appended to the default policy |
+
+Use the `securityCSPDirectives` field to add directives that the default policy does not cover, for example to allow an external analytics script or an embedded video provider.
+
+## Subresource integrity (SRI)
+
+When `securitySRI` is enabled, Wiki.js adds `integrity` attributes to `<script>` and `<link>` tags for static assets it controls. Browsers verify the hash before executing the resource, ensuring that a compromised CDN or proxy cannot inject malicious code.
+
+## Iframe embedding
+
+The `securityIframe` setting controls whether other sites can embed your wiki in an `<iframe>`. When disabled, Wiki.js sets `X-Frame-Options: SAMEORIGIN`, restricting framing to pages on the same origin. Enable this only if you have a specific requirement to embed wiki pages inside another application.
+
+<Warning>
+  Allowing iframe embedding from arbitrary origins exposes your wiki to clickjacking attacks. If you need to embed a specific page in an external application, prefer a targeted CSP `frame-ancestors` directive over a blanket enable.
+</Warning>
+
+## Open redirect protection
+
+When `securityOpenRedirect` is enabled, Wiki.js validates redirect targets in post-login flows to ensure they point to paths within the same origin. This prevents an attacker from constructing a login URL that silently redirects a user to a malicious external site after successful authentication.
+
+<Note>
+  This setting is enabled by default. There is rarely a reason to disable it.
+</Note>
+
+## Referrer policy
+
+Enabling `securityReferrerPolicy` adds a `Referrer-Policy: same-origin` header to responses. This prevents the browser from sending the full URL of the originating wiki page in the `Referer` header when a user follows a link to an external site, limiting unintentional information leakage.
+
+## Trust proxy
+
+The `securityTrustProxy` setting instructs the Wiki.js application server to trust the `X-Forwarded-For` and related headers injected by a reverse proxy (nginx, Traefik, Caddy, etc.). Enable this when Wiki.js sits behind a proxy so that rate limiting, logging, and HSTS redirect logic use the visitor's real IP address rather than the proxy's address.
+
+<Warning>
+  Only enable trust proxy if Wiki.js is actually running behind a reverse proxy on a network you control. Enabling it on a directly exposed server allows any client to spoof its IP address by setting `X-Forwarded-For` in the request.
+</Warning>
+
+## Upload security
+
+Four settings govern file uploads made through the wiki's asset manager:
+
+| Setting | Config field | Description |
+|---|---|---|
+| Scan SVG files | `uploadScanSVG` | Parse uploaded SVG files and strip embedded scripts before storing |
+| Force download | `uploadForceDownload` | Serve all uploaded files with `Content-Disposition: attachment` to prevent in-browser execution |
+| Maximum file size | `uploadMaxFileSize` | Size limit per file in bytes |
+| Maximum files per upload | `uploadMaxFiles` | Maximum number of files accepted in a single upload request |
+
+<Tip>
+  Enable both SVG scanning and force-download together. SVG files can carry embedded JavaScript, and forcing a download for all assets ensures that even a bypassed SVG is not executed in the browser.
+</Tip>
+
+## Two-factor authentication enforcement
+
+The `authEnforce2FA` flag requires every user to configure and use a TOTP-based authenticator before accessing the wiki. Users who have not yet set up TFA are redirected through the setup flow on their next login attempt.
+
+For per-user TFA management, see [Managing Users and Groups](/admin/users-and-groups).

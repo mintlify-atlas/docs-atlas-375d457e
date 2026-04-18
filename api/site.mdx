@@ -1,0 +1,138 @@
+---
+title: "Site Configuration GraphQL API Reference"
+description: "Read and update Wiki.js site-wide settings via GraphQL. Covers title, branding, authentication, security policies, feature flags, and upload limits."
+---
+
+The Site API exposes a single query for reading the current site configuration and a mutation for updating it. These settings correspond to what you configure in the Admin panel under **General**, **Security**, and **Features**.
+
+<Note>
+Site configuration requires the `manage:system` permission.
+</Note>
+
+## Query
+
+### `config` — Get site configuration
+
+```graphql
+query {
+  site {
+    config {
+      host
+      title
+      description
+      company
+      logoUrl
+      contentLicense
+      pageExtensions
+      authAutoLogin
+      authEnforce2FA
+      authHideLocal
+      authJwtExpiration
+      featurePageRatings
+      featurePageComments
+      securityHSTS
+      securityCSP
+      uploadMaxFileSize
+      uploadMaxFiles
+    }
+  }
+}
+```
+
+---
+
+## Mutation
+
+### `updateConfig` — Update site settings
+
+```graphql
+mutation {
+  site {
+    updateConfig(
+      title: "My Company Wiki"
+      description: "Internal knowledge base"
+      host: "https://wiki.example.com"
+      company: "Acme Corp"
+      logoUrl: "https://example.com/logo.png"
+      authEnforce2FA: true
+      featurePageComments: true
+      securityHSTS: true
+      securityHSTSDuration: 300
+      uploadMaxFileSize: 10485760
+      uploadMaxFiles: 10
+    ) {
+      responseResult { succeeded errorCode message }
+    }
+  }
+}
+```
+
+---
+
+## Configuration fields
+
+### General
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `host` | `String` | Full public URL of the wiki (e.g. `https://wiki.example.com`) |
+| `title` | `String` | Wiki name shown in the browser tab and header |
+| `description` | `String` | Short description for SEO metadata |
+| `company` | `String` | Organization name shown in the footer |
+| `contentLicense` | `String` | Content license (e.g. `cc-by-sa-4`) |
+| `logoUrl` | `String` | URL to a custom logo image |
+| `pageExtensions` | `String` | Allowed page path extensions |
+| `analyticsService` | `String` | Analytics provider key |
+| `analyticsId` | `String` | Analytics tracking ID |
+| `footerOverride` | `String` | Custom footer HTML |
+| `robots` | `[String]` | Robots meta tag values (e.g. `["index", "follow"]`) |
+
+### Authentication settings
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `authAutoLogin` | `Boolean` | Automatically redirect to the first enabled auth provider |
+| `authEnforce2FA` | `Boolean` | Require TFA for all users |
+| `authHideLocal` | `Boolean` | Hide the local login form |
+| `authLoginBgUrl` | `String` | Custom background image URL for the login page |
+| `authJwtAudience` | `String` | JWT audience claim |
+| `authJwtExpiration` | `String` | JWT token expiry duration (e.g. `30m`, `1h`) |
+| `authJwtRenewablePeriod` | `String` | Window during which a token can be silently renewed |
+
+### Feature flags
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `featurePageRatings` | `Boolean` | Enable page rating (thumbs up/down) |
+| `featurePageComments` | `Boolean` | Enable reader comments on pages |
+| `featurePersonalWikis` | `Boolean` | Enable personal wiki namespaces per user |
+| `editFab` | `Boolean` | Show the floating edit button on pages |
+| `editMenuBar` | `Boolean` | Show the edit bar at the top of pages |
+| `editMenuBtn` | `Boolean` | Show the edit button in the page menu |
+| `editMenuExternalBtn` | `Boolean` | Show an external edit button |
+| `editMenuExternalName` | `String` | Label for the external edit button |
+| `editMenuExternalIcon` | `String` | Icon for the external edit button |
+| `editMenuExternalUrl` | `String` | URL template for the external edit button |
+
+### Security settings
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `securityOpenRedirect` | `Boolean` | Allow open redirects (disabled by default) |
+| `securityIframe` | `Boolean` | Allow embedding in iframes |
+| `securityReferrerPolicy` | `Boolean` | Set a strict referrer policy header |
+| `securityTrustProxy` | `Boolean` | Trust `X-Forwarded-*` headers from a reverse proxy |
+| `securitySRI` | `Boolean` | Enable Subresource Integrity checks |
+| `securityHSTS` | `Boolean` | Enable HTTP Strict Transport Security |
+| `securityHSTSDuration` | `Int` | HSTS max-age in seconds |
+| `securityCSP` | `Boolean` | Enable Content Security Policy header |
+| `securityCSPDirectives` | `String` | Custom CSP directive string |
+
+### Upload settings
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `uploadMaxFileSize` | `Int` | Maximum upload file size in bytes (e.g. `5242880` for 5 MB) |
+| `uploadMaxFiles` | `Int` | Maximum number of files per upload request |
+| `uploadScanSVG` | `Boolean` | Scan SVG files for malicious content |
+| `uploadForceDownload` | `Boolean` | Force all files to download rather than display inline |

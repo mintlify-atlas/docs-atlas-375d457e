@@ -1,0 +1,243 @@
+---
+title: "Creating and editing pages in Wiki.js"
+description: "Write wiki content using Markdown, WYSIWYG, AsciiDoc, or the API editor. Covers page creation, metadata, version history, and content types."
+---
+
+Pages are the core building block of Wiki.js. Each page has a unique path (used as its URL), a locale, a title, a description, tags, and content stored in the format of whichever editor created it. You choose an editor when you first create a page, and you can convert between compatible editors later. The rendering pipeline transforms your content into HTML on the fly, applying syntax highlighting, diagram rendering, math typesetting, and other extensions along the way.
+
+## Available editors
+
+Wiki.js ships with six editor types. Choose the one that matches your workflow and your readers' needs.
+
+<Tabs>
+  <Tab title="Markdown">
+    The Markdown editor is the most capable option for technical writers. It uses a CommonMark-compatible parser with a rich set of extensions enabled by default.
+
+    **Supported extensions:**
+
+    | Extension | Notes |
+    |-----------|-------|
+    | Tables | GitHub-Flavored Markdown table syntax |
+    | Footnotes | `[^1]` reference-style footnotes |
+    | Task lists | `- [ ]` and `- [x]` checkboxes |
+    | Emoji shortcodes | `:smile:` converted to Unicode emoji |
+    | Superscript / subscript | `^sup^` and `~sub~` syntax |
+    | Abbreviations | Expand abbreviations on hover |
+    | Expanded tabs | Convert tab characters to spaces |
+    | Multi-table | Extended table formatting |
+    | Pivot table | Aggregated data tables |
+
+    **Diagram and math rendering** (via the rendering pipeline — see below):
+
+    - Mermaid flowcharts and sequence diagrams
+    - PlantUML diagrams
+    - Kroki diagrams (supports many diagram types via a Kroki server)
+    - KaTeX math typesetting (enabled by default)
+    - MathJax math typesetting (alternative to KaTeX)
+
+    **Inline HTML** is allowed by default, and plain URLs are automatically converted to links.
+  </Tab>
+  <Tab title="Visual Editor (CKEditor 5)">
+    The **Visual Editor** (`ckeditor`) is a rich-text WYSIWYG editor powered by CKEditor 5. It stores content as HTML. Use it when your contributors are not comfortable with markup syntax and need a word-processor-like experience.
+
+    <Note>
+      The Visual Editor produces HTML content. The full rendering pipeline still runs on the HTML output, so features like Twemoji and code highlighting still apply.
+    </Note>
+  </Tab>
+  <Tab title="WYSIWYG">
+    The **WYSIWYG** editor is an advanced visual HTML builder. Like the Visual Editor, it stores content as HTML and is suited for users who prefer a graphical editing experience with more layout control.
+  </Tab>
+  <Tab title="AsciiDoc">
+    The **AsciiDoc** editor provides full AsciiDoc support. Content is stored as raw AsciiDoc source and rendered through the AsciiDoc rendering pipeline. Use it if your team already works with AsciiDoc toolchains or technical documentation workflows.
+  </Tab>
+  <Tab title="Code">
+    The **Code** editor lets you write raw HTML directly. Content is stored as HTML and rendered as-is (with the HTML post-processing pipeline applied). Use it for pages that require precise HTML structure.
+  </Tab>
+  <Tab title="API">
+    The **API** editor (`api`) is used for pages created programmatically via the GraphQL API or for REST/GraphQL documentation pages. Content is stored as YAML. Use it when you are generating wiki pages from automated pipelines.
+
+    See the [GraphQL mutations reference](#programmatic-page-creation) below for details on creating pages via the API.
+  </Tab>
+  <Tab title="Redirect">
+    A **Redirect** page does not display any content. Instead, it immediately redirects visitors from one path to another. Use it to preserve old URLs after moving or renaming a page.
+  </Tab>
+</Tabs>
+
+## Page metadata
+
+Every page carries the following metadata fields:
+
+| Field | Description |
+|-------|-------------|
+| `path` | The URL slug for the page (e.g. `docs/getting-started`). Must be unique within a locale. |
+| `locale` | The language locale code (e.g. `en`, `fr`). Allows the same path to exist in multiple languages. |
+| `title` | The human-readable page title shown in the browser and navigation. |
+| `description` | A short summary used in search results and meta tags. |
+| `tags` | One or more tags for categorization and filtering. |
+| `isPublished` | Whether the page is publicly visible. Unpublished pages are only accessible to users with `write:pages` or `manage:system` permission. |
+| `isPrivate` | Restricts the page to a private namespace. |
+| `publishStartDate` | The date and time at which the page becomes visible (optional). |
+| `publishEndDate` | The date and time at which the page stops being visible (optional). |
+| `scriptCss` | Custom CSS injected only on this page. |
+| `scriptJs` | Custom JavaScript injected only on this page. |
+
+<Tip>
+  Use `publishStartDate` and `publishEndDate` to schedule pages — for example, a release announcement that should appear on launch day and be removed after a set period.
+</Tip>
+
+## Tags
+
+You can assign multiple tags to a page. Tags are searchable and filterable from the page list view. Admins can rename or delete tags globally from the administration panel.
+
+To filter pages by tag via the API, pass the `tags` argument to the `pages.list` query:
+
+```graphql
+query {
+  pages {
+    list(tags: ["release-notes", "v3"]) {
+      id
+      path
+      title
+    }
+  }
+}
+```
+
+## Version history
+
+Every time you save a page, Wiki.js records a history entry containing the full content, metadata, and the name of the author who made the change. You can:
+
+- **View the history trail** — browse past versions with timestamps and author names.
+- **Inspect a specific version** — see the full content of any historical version.
+- **Restore a previous version** — roll back to any earlier version with a single action (requires `write:pages` or `manage:pages` permission).
+- **Purge old history** — administrators can remove history entries older than a specified date to reclaim storage.
+
+<Note>
+  Viewing page history requires the `read:history` permission. Restoring a version requires `write:pages` or `manage:pages`.
+</Note>
+
+## Page tree
+
+Wiki.js organizes pages in a hierarchical tree based on their paths. A page at `docs/api/authentication` is automatically nested under `docs/api`, which is nested under `docs`. You can browse this tree in the sidebar or query it via the `pages.tree` API:
+
+```graphql
+query {
+  pages {
+    tree(locale: "en", mode: ALL) {
+      id
+      path
+      depth
+      title
+      isFolder
+      parent
+    }
+  }
+}
+```
+
+The tree supports three modes: `FOLDERS` (only folder nodes), `PAGES` (only leaf pages), and `ALL` (both).
+
+## Rendering pipeline extensions
+
+After content is written and saved, Wiki.js runs it through a configurable rendering pipeline before serving it to readers. Administrators can enable or disable individual pipeline modules from the admin panel under **Rendering**.
+
+<AccordionGroup>
+  <Accordion title="Diagrams">
+    | Module | Description | Enabled by default |
+    |--------|-------------|--------------------|
+    | Mermaid | Renders Mermaid flowcharts, sequence diagrams, Gantt charts, and more | Yes |
+    | PlantUML | Renders PlantUML diagrams via a PlantUML server | Yes |
+    | Kroki | Renders diagrams using a Kroki server (supports many diagram types) | No |
+    | Diagrams post-processor | Post-processes draw.io diagrams embedded in HTML | Yes |
+
+    For PlantUML and Kroki, you must configure the URL of your server instance in the module settings.
+  </Accordion>
+  <Accordion title="Math typesetting">
+    | Module | Description | Enabled by default |
+    |--------|-------------|--------------------|
+    | KaTeX | LaTeX math and chemical expression typesetting | Yes |
+    | MathJax | Alternative LaTeX math renderer | No |
+
+    Enable either KaTeX or MathJax — not both. KaTeX is faster; MathJax has broader LaTeX coverage.
+  </Accordion>
+  <Accordion title="Code and media">
+    | Module | Description | Enabled by default |
+    |--------|-------------|--------------------|
+    | Code Highlighting | Detects and syntax-highlights code blocks | Yes |
+    | Media Players | Embeds YouTube, Vimeo, SoundCloud, and other media | Yes |
+    | Asciinema | Embeds Asciinema terminal recordings | No |
+  </Accordion>
+  <Accordion title="Markdown extensions">
+    | Module | Description | Enabled by default |
+    |--------|-------------|--------------------|
+    | Task Lists | Converts `- [ ]` / `- [x]` to interactive checkboxes | Yes |
+    | Emoji | Converts `:shortcode:` to Unicode emoji | Yes |
+    | Footnotes | Parses `[^1]` footnote references | Yes |
+    | Superscript / Subscript | `^sup^` and `~sub~` syntax | Yes |
+    | Abbreviations | Expand abbreviations on hover | Yes |
+  </Accordion>
+  <Accordion title="HTML post-processing">
+    | Module | Description | Enabled by default |
+    |--------|-------------|--------------------|
+    | Twemoji | Replaces Unicode emoji with Twitter emoji images | Yes |
+    | Tabsets | Transforms consecutive headers into tab groups | Yes |
+    | Image prefetch | Adds prefetch hints for embedded images | Yes |
+    | Security | Strips unsafe HTML attributes | Yes |
+    | Blockquotes | Enhanced blockquote styling | Yes |
+  </Accordion>
+</AccordionGroup>
+
+## Programmatic page creation
+
+You can create, update, move, and delete pages via the GraphQL API. All mutations require appropriate permissions.
+
+**Create a page:**
+
+```graphql
+mutation {
+  pages {
+    create(
+      path: "guides/my-new-page"
+      locale: "en"
+      title: "My New Page"
+      description: "A page created via the API"
+      content: "# Hello\n\nThis page was created programmatically."
+      editor: "markdown"
+      isPublished: true
+      isPrivate: false
+      tags: ["api", "guide"]
+    ) {
+      responseResult {
+        succeeded
+        message
+      }
+      page {
+        id
+        path
+      }
+    }
+  }
+}
+```
+
+**Move a page** (requires `manage:pages`):
+
+```graphql
+mutation {
+  pages {
+    move(
+      id: 42
+      destinationPath: "archive/my-old-page"
+      destinationLocale: "en"
+    ) {
+      responseResult {
+        succeeded
+      }
+    }
+  }
+}
+```
+
+<Warning>
+  Moving a page does not automatically create a redirect. Create a Redirect page at the old path if you need to preserve inbound links.
+</Warning>

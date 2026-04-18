@@ -1,0 +1,121 @@
+{
+  "projectType": "saas",
+  "projectName": "Wiki.js",
+  "projectDescription": "A modern, lightweight, and powerful open-source wiki application built on Node.js with support for multiple editors, authentication providers, storage backends, and search engines.",
+  "theme": "palm",
+  "primaryColor": "#127fbc",
+  "lightColor": "#60789c",
+  "darkColor": "#d3e0e9",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "getting-started/requirements",
+              "getting-started/installation",
+              "getting-started/configuration"
+            ]
+          },
+          {
+            "group": "Core Features",
+            "pages": [
+              "features/pages-and-editors",
+              "features/assets",
+              "features/search",
+              "features/comments-and-ratings",
+              "features/navigation-and-themes"
+            ]
+          },
+          {
+            "group": "Administration",
+            "pages": [
+              "admin/users-and-groups",
+              "admin/permissions",
+              "admin/authentication",
+              "admin/storage",
+              "admin/security"
+            ]
+          },
+          {
+            "group": "Integrations",
+            "pages": [
+              "integrations/storage-backends",
+              "integrations/search-engines",
+              "integrations/analytics",
+              "integrations/logging"
+            ]
+          },
+          {
+            "group": "Deployment",
+            "pages": [
+              "deployment/docker",
+              "deployment/reverse-proxy",
+              "deployment/high-availability",
+              "deployment/upgrade"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Overview",
+            "pages": [
+              "api/overview",
+              "api/authentication"
+            ]
+          },
+          {
+            "group": "GraphQL API",
+            "pages": [
+              "api/pages",
+              "api/users",
+              "api/groups",
+              "api/assets",
+              "api/site"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Multiple content editors: Markdown, WYSIWYG (CKEditor), AsciiDoc, API, Code, and Redirect",
+    "21+ authentication providers including OAuth2, OIDC, SAML, LDAP, and social login",
+    "11+ storage backends including Git, AWS S3, Azure Blob, Google Drive, Dropbox, and SFTP",
+    "9+ search engines including PostgreSQL full-text, Elasticsearch, Algolia, and Solr",
+    "Rich rendering pipeline: diagrams (Mermaid, PlantUML, Kroki), math (KaTeX, MathJax), syntax highlighting",
+    "Fine-grained group-based permissions with page-level access rules",
+    "Multi-language (i18n) support with locale-aware pages",
+    "GraphQL API with JWT authentication and API key support",
+    "High-availability mode for multi-instance deployments with PostgreSQL",
+    "Two-factor authentication (TOTP) support",
+    "Full page version history with diff and restore capabilities",
+    "Tags, page tree, and cross-page link tracking"
+  ],
+  "publicApiSurface": [
+    "GraphQL endpoint: POST /graphql",
+    "pages.list - List all pages with filtering and ordering",
+    "pages.single / pages.singleByPath - Get a page by ID or path",
+    "pages.search - Full-text search across pages",
+    "pages.create - Create a new page",
+    "pages.update - Update page content and metadata",
+    "pages.delete - Delete a page",
+    "pages.history - Get version history for a page",
+    "pages.restore - Restore a page to a previous version",
+    "authentication.login - Authenticate and get JWT token",
+    "authentication.createApiKey - Create a long-lived API key",
+    "users.list / users.single - List or get user details",
+    "users.create / users.update / users.delete - Manage users",
+    "groups.list / groups.single - List or get group details",
+    "groups.create / groups.update / groups.delete - Manage groups",
+    "assets.list / assets.get - Manage uploaded files and assets",
+    "storage.targets / storage.updateTargets - Configure storage backends",
+    "search.searchEngines / search.rebuildIndex - Manage search engines"
+  ]
+}

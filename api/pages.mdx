@@ -1,0 +1,269 @@
+---
+title: "Pages GraphQL API Reference"
+description: "Query and mutate wiki pages via GraphQL. List, search, create, update, delete, and move pages. Access version history and resolve edit conflicts."
+---
+
+The Pages API lets you programmatically create and manage all content in your Wiki.js instance. Every page operation — from listing pages to restoring old versions — is available through the GraphQL endpoint at `POST /graphql`.
+
+## Queries
+
+All page queries are nested under `pages { ... }`.
+
+### `list` — List all pages
+
+```graphql
+query {
+  pages {
+    list(limit: 50, orderBy: UPDATED, orderByDirection: DESC, locale: "en") {
+      id
+      path
+      title
+      description
+      locale
+      isPublished
+      isPrivate
+      contentType
+      createdAt
+      updatedAt
+      tags
+    }
+  }
+}
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `limit` | `Int` | Maximum number of results to return |
+| `orderBy` | `PageOrderBy` | Sort field: `CREATED`, `ID`, `PATH`, `TITLE`, `UPDATED` |
+| `orderByDirection` | `PageOrderByDirection` | `ASC` or `DESC` |
+| `tags` | `[String!]` | Filter by tag slugs |
+| `locale` | `String` | Filter by locale code (e.g. `en`) |
+| `creatorId` | `Int` | Filter by creator user ID |
+| `authorId` | `Int` | Filter by last author user ID |
+
+### `single` — Get a page by ID
+
+```graphql
+query {
+  pages {
+    single(id: 42) {
+      id
+      path
+      title
+      content
+      render
+      locale
+      editor
+      tags { tag title }
+      createdAt
+      updatedAt
+    }
+  }
+}
+```
+
+### `singleByPath` — Get a page by path and locale
+
+```graphql
+query {
+  pages {
+    singleByPath(path: "docs/getting-started", locale: "en") {
+      id
+      title
+      content
+      render
+    }
+  }
+}
+```
+
+### `search` — Full-text search
+
+```graphql
+query {
+  pages {
+    search(query: "installation guide", locale: "en") {
+      results {
+        id
+        title
+        description
+        path
+        locale
+      }
+      suggestions
+      totalHits
+    }
+  }
+}
+```
+
+### `tree` — Page hierarchy
+
+```graphql
+query {
+  pages {
+    tree(path: "docs", locale: "en", mode: ALL, includeAncestors: false) {
+      id
+      path
+      title
+      depth
+      isFolder
+      isPrivate
+      parent
+    }
+  }
+}
+```
+
+`mode` accepts `FOLDERS`, `PAGES`, or `ALL`.
+
+### `history` — Version history for a page
+
+```graphql
+query {
+  pages {
+    history(id: 42, offsetPage: 0, offsetSize: 20) {
+      total
+      trail {
+        versionId
+        versionDate
+        authorName
+        actionType
+      }
+    }
+  }
+}
+```
+
+---
+
+## Mutations
+
+All page mutations are nested under `pages { ... }` and return a `responseResult` with `succeeded`, `errorCode`, and `message`.
+
+### `create` — Create a new page
+
+```graphql
+mutation {
+  pages {
+    create(
+      path: "docs/my-new-page"
+      locale: "en"
+      title: "My New Page"
+      description: "A page created via the API"
+      content: "# Hello\n\nThis page was created programmatically."
+      editor: "markdown"
+      isPublished: true
+      isPrivate: false
+      tags: ["api", "example"]
+    ) {
+      responseResult { succeeded errorCode message }
+      page { id path }
+    }
+  }
+}
+```
+
+<ParamField path="path" type="String" required>
+  URL path for the page (e.g. `docs/getting-started`). Use forward slashes for nesting.
+</ParamField>
+<ParamField path="locale" type="String" required>
+  Locale code (e.g. `en`, `fr`, `de`).
+</ParamField>
+<ParamField path="title" type="String" required>
+  Page title displayed in the header and navigation.
+</ParamField>
+<ParamField path="content" type="String" required>
+  Page content in the format matching the chosen editor.
+</ParamField>
+<ParamField path="editor" type="String" required>
+  Editor key: `markdown`, `ckeditor`, `asciidoc`, `code`, `api`, or `redirect`.
+</ParamField>
+<ParamField path="isPublished" type="Boolean" required>
+  Whether the page is visible to readers.
+</ParamField>
+<ParamField path="isPrivate" type="Boolean" required>
+  Whether the page is restricted to authorized users only.
+</ParamField>
+<ParamField path="tags" type="[String]" required>
+  Array of tag slugs to assign.
+</ParamField>
+<ParamField path="description" type="String" required>
+  Short description shown in search results and page metadata.
+</ParamField>
+<ParamField path="publishStartDate" type="Date">
+  Optional scheduled publish date.
+</ParamField>
+<ParamField path="publishEndDate" type="Date">
+  Optional scheduled unpublish date.
+</ParamField>
+
+### `update` — Update an existing page
+
+```graphql
+mutation {
+  pages {
+    update(
+      id: 42
+      title: "Updated Title"
+      content: "# Updated\n\nNew content here."
+      tags: ["updated"]
+    ) {
+      responseResult { succeeded errorCode message }
+    }
+  }
+}
+```
+
+All fields except `id` are optional. Only provided fields are updated.
+
+### `move` — Move a page to a new path
+
+```graphql
+mutation {
+  pages {
+    move(id: 42, destinationPath: "archive/old-page", destinationLocale: "en") {
+      responseResult { succeeded errorCode message }
+    }
+  }
+}
+```
+
+### `delete` — Delete a page
+
+```graphql
+mutation {
+  pages {
+    delete(id: 42) {
+      responseResult { succeeded errorCode message }
+    }
+  }
+}
+```
+
+### `restore` — Restore a page to a previous version
+
+```graphql
+mutation {
+  pages {
+    restore(pageId: 42, versionId: 7) {
+      responseResult { succeeded errorCode message }
+    }
+  }
+}
+```
+
+Use `pages { history(id: ...) }` to find valid `versionId` values.
+
+### Other mutations
+
+| Mutation | Description |
+|----------|-------------|
+| `convert(id, editor)` | Convert a page to a different editor format |
+| `deleteTag(id)` | Delete a tag by ID |
+| `updateTag(id, tag, title)` | Rename a tag |
+| `flushCache` | Clear the page render cache |
+| `rebuildTree` | Rebuild the page hierarchy tree |
+| `render(id)` | Force re-render a page |
+| `purgeHistory(olderThan)` | Delete history entries older than a duration |
+| `migrateToLocale(sourceLocale, targetLocale)` | Migrate pages between locales |

@@ -1,0 +1,178 @@
+---
+title: "Groups GraphQL API Reference"
+description: "Manage Wiki.js groups via GraphQL. Create groups, assign permissions and page rules, add or remove users, and control access to wiki content."
+---
+
+Groups are the primary unit of access control in Wiki.js. Every user belongs to one or more groups, and each group carries a set of permissions and optional page rules that determine what content members can read, write, or manage.
+
+<Note>
+Group management requires the `write:groups`, `manage:groups`, or `manage:system` permission.
+</Note>
+
+## Queries
+
+### `list` — List all groups
+
+```graphql
+query {
+  groups {
+    list(filter: "editors", orderBy: "name") {
+      id
+      name
+      isSystem
+      userCount
+      createdAt
+      updatedAt
+    }
+  }
+}
+```
+
+### `single` — Get a group by ID
+
+```graphql
+query {
+  groups {
+    single(id: 2) {
+      id
+      name
+      isSystem
+      redirectOnLogin
+      permissions
+      pageRules {
+        id
+        deny
+        match
+        roles
+        path
+        locales
+      }
+      users {
+        id
+        name
+        email
+      }
+    }
+  }
+}
+```
+
+---
+
+## Mutations
+
+### `create` — Create a new group
+
+```graphql
+mutation {
+  groups {
+    create(name: "Technical Writers") {
+      responseResult { succeeded errorCode message }
+      group { id name }
+    }
+  }
+}
+```
+
+### `update` — Update a group's permissions and rules
+
+```graphql
+mutation {
+  groups {
+    update(
+      id: 3
+      name: "Technical Writers"
+      redirectOnLogin: "/docs"
+      permissions: ["read:pages", "write:pages", "read:assets", "write:assets"]
+      pageRules: [
+        {
+          id: "rule-1"
+          deny: false
+          match: START
+          roles: ["read:pages", "write:pages"]
+          path: "docs/"
+          locales: ["en"]
+        }
+      ]
+    ) {
+      responseResult { succeeded errorCode message }
+    }
+  }
+}
+```
+
+<ParamField path="id" type="Int" required>
+  Group ID to update.
+</ParamField>
+<ParamField path="permissions" type="[String]" required>
+  Full list of permissions to assign. Replaces existing permissions entirely.
+</ParamField>
+<ParamField path="pageRules" type="[PageRuleInput]" required>
+  Full list of page rules. Replaces existing rules entirely.
+</ParamField>
+<ParamField path="redirectOnLogin" type="String" required>
+  Path to redirect users to after login. Use `/` for the home page.
+</ParamField>
+
+### `delete` — Delete a group
+
+```graphql
+mutation {
+  groups {
+    delete(id: 3) {
+      responseResult { succeeded errorCode message }
+    }
+  }
+}
+```
+
+<Warning>
+You cannot delete system groups (Administrators, Guests). Deleting a group removes all users from it but does not delete the users.
+</Warning>
+
+### `assignUser` / `unassignUser` — Manage group membership
+
+```graphql
+mutation {
+  groups {
+    assignUser(groupId: 3, userId: 7) {
+      responseResult { succeeded errorCode message }
+    }
+  }
+}
+```
+
+```graphql
+mutation {
+  groups {
+    unassignUser(groupId: 3, userId: 7) {
+      responseResult { succeeded errorCode message }
+    }
+  }
+}
+```
+
+---
+
+## Page rule reference
+
+Page rules let you grant or deny specific roles on paths within a group.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | `String` | Unique rule identifier (any string) |
+| `deny` | `Boolean` | `true` to deny, `false` to allow |
+| `match` | `PageRuleMatch` | How to match the path (see below) |
+| `roles` | `[String]` | Roles to apply: `read:pages`, `write:pages`, `manage:pages`, etc. |
+| `path` | `String` | Path to match against |
+| `locales` | `[String]` | Locale codes to apply the rule to, or empty for all |
+
+**`PageRuleMatch` values:**
+
+| Value | Description |
+|-------|-------------|
+| `START` | Path starts with the given value |
+| `EXACT` | Path matches exactly |
+| `END` | Path ends with the given value |
+| `REGEX` | Path matches the given regular expression |
+| `TAG` | Pages tagged with the given tag slug |

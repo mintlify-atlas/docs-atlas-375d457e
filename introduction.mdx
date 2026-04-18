@@ -1,0 +1,74 @@
+---
+title: "Wiki.js: Modern Open-Source Wiki for Teams"
+description: "Wiki.js is a powerful, self-hosted wiki built on Node.js. Supports Markdown, WYSIWYG, Git sync, 21+ auth providers, and a full GraphQL API."
+---
+
+Wiki.js is a modern, open-source wiki application built on Node.js that makes it easy for teams to create, manage, and share knowledge. Whether you're running a small team or a large organization, Wiki.js adapts to your workflow with flexible editors, powerful access control, and integrations with the tools you already use.
+
+<CardGroup cols={2}>
+  <Card title="Quick Start" icon="rocket" href="/getting-started/installation">
+    Install Wiki.js and get your wiki running in minutes with Docker or Node.js.
+  </Card>
+  <Card title="Pages & Editors" icon="pen-to-square" href="/features/pages-and-editors">
+    Write content with Markdown, WYSIWYG, AsciiDoc, or the API editor.
+  </Card>
+  <Card title="Administration" icon="gear" href="/admin/users-and-groups">
+    Manage users, groups, permissions, and authentication strategies.
+  </Card>
+  <Card title="API Reference" icon="code" href="/api/overview">
+    Automate everything with the GraphQL API and API key authentication.
+  </Card>
+</CardGroup>
+
+## What is Wiki.js?
+
+Wiki.js is a self-hosted knowledge base platform designed for teams who want full control over their documentation. It stores content in a database (PostgreSQL, MySQL, MariaDB, MS SQL Server, or SQLite) and can optionally sync to Git repositories, cloud storage, or other backends.
+
+Key capabilities include:
+
+- **Multiple editors** — Choose from Markdown, WYSIWYG (CKEditor), AsciiDoc, raw HTML, or the REST/GraphQL API
+- **Authentication flexibility** — 21+ providers including Local, LDAP, OAuth2, SAML, Google, GitHub, and more
+- **Storage backends** — Git, AWS S3, Azure Blob, Google Drive, Dropbox, SFTP, and more
+- **Full-text search** — PostgreSQL built-in, Elasticsearch, Algolia, Solr, and others
+- **Access control** — Group-based permissions with page-level rules
+- **GraphQL API** — Full programmatic access to all content and admin operations
+
+## Get started
+
+<Steps>
+  <Step title="Check requirements">
+    Review the [system requirements](/getting-started/requirements) for Node.js version, database, and memory.
+  </Step>
+  <Step title="Install Wiki.js">
+    Follow the [installation guide](/getting-started/installation) to set up Wiki.js using Docker or Node.js directly.
+  </Step>
+  <Step title="Configure your instance">
+    Edit `config.yml` and run the setup wizard to connect your database and set up the first admin account.
+  </Step>
+  <Step title="Invite your team">
+    Create groups, set permissions, and enable authentication providers so your team can log in and start contributing.
+  </Step>
+</Steps>
+
+## Explore the docs
+
+<CardGroup cols={2}>
+  <Card title="System Requirements" icon="server" href="/getting-started/requirements">
+    Node.js, database, and memory requirements before you install.
+  </Card>
+  <Card title="Configuration Reference" icon="sliders" href="/getting-started/configuration">
+    All config.yml options explained: database, SSL, ports, and more.
+  </Card>
+  <Card title="Authentication Providers" icon="lock" href="/admin/authentication">
+    Configure local accounts, LDAP, OAuth2, SAML, and social login.
+  </Card>
+  <Card title="Storage Backends" icon="database" href="/integrations/storage-backends">
+    Sync content to Git, S3, Azure Blob, Google Drive, and more.
+  </Card>
+  <Card title="Search Engines" icon="magnifying-glass" href="/integrations/search-engines">
+    Enable full-text search with PostgreSQL, Elasticsearch, Algolia, and more.
+  </Card>
+  <Card title="Deployment Guide" icon="cloud" href="/deployment/docker">
+    Deploy Wiki.js with Docker, Docker Compose, or Kubernetes.
+  </Card>
+</CardGroup>

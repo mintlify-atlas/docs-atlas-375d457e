@@ -1,0 +1,163 @@
+---
+title: "Connecting Storage Backends to Wiki.js"
+description: "Sync Wiki.js pages and assets to Git, AWS S3, Azure Blob, Google Drive, Dropbox, SFTP, and 5 other backends for backup and content portability."
+---
+
+Storage backends let you push your wiki's pages and assets out of the database to an external location — whether that's a Git repository, a cloud object store, a network share, or a file hosting service. This gives you version history, offsite backups, and the ability to manage content in external tools without losing data if something happens to your Wiki.js instance.
+
+## Available backends
+
+<CardGroup cols={2}>
+  <Card title="Git" icon="code-branch">
+    Sync pages to any Git remote (GitHub, GitLab, Gitea, etc.) over SSH or HTTPS. Supports push, pull, and bi-directional sync. Each page save commits a new entry authored by the editing user.
+  </Card>
+  <Card title="Amazon S3" icon="cloud">
+    Push pages and assets to an AWS S3 bucket. Requires an IAM access key with write access to the target bucket.
+  </Card>
+  <Card title="S3 Generic" icon="cloud">
+    Like Amazon S3 but for any S3-compatible endpoint — MinIO, Wasabi, Backblaze B2, and others. Configure the custom endpoint URI directly.
+  </Card>
+  <Card title="Azure Blob Storage" icon="microsoft">
+    Push content to an Azure Blob Storage container. Supports Hot and Cool storage tiers. The container is created automatically if it does not exist.
+  </Card>
+  <Card title="DigitalOcean Spaces" icon="droplet">
+    Push content to a DigitalOcean Spaces bucket using the S3-compatible API. Choose from available regional endpoints.
+  </Card>
+  <Card title="Local File System" icon="hard-drive">
+    Write pages to a directory on the local disk or a network share. Optionally creates daily compressed backups in a `_daily` subfolder, retained for one month.
+  </Card>
+  <Card title="SFTP" icon="lock">
+    Push content to a remote server over SSH using either private key or password authentication. A private key is recommended for best security.
+  </Card>
+  <Card title="Google Drive" icon="google">
+    Push content to Google Drive using OAuth client credentials.
+  </Card>
+  <Card title="Dropbox" icon="box">
+    Push content to Dropbox using an app key and app secret.
+  </Card>
+  <Card title="OneDrive" icon="microsoft">
+    Push content to Microsoft OneDrive using OAuth client credentials.
+  </Card>
+  <Card title="Box" icon="box-open">
+    Push content to Box using client credentials and a root folder identifier.
+  </Card>
+</CardGroup>
+
+## Sync modes
+
+Not every backend supports every direction of sync. The table below describes what each mode does.
+
+| Mode | Direction | Description |
+|---|---|---|
+| Push | Wiki.js → remote | Pages saved in the wiki are written to the external backend. The remote is treated as a read-only mirror. |
+| Pull | Remote → Wiki.js | Content in the remote is imported into Wiki.js on the configured schedule. External edits are reflected in the wiki. |
+| Bi-directional (Sync) | Both | Changes flow in both directions. Conflicts are resolved using standard Git merge rules. |
+
+<Note>
+  Most backends (Amazon S3, Azure Blob, DigitalOcean Spaces, SFTP, Local File System) support push only. Only the Git backend supports all three modes and is the only backend with a configurable sync schedule.
+</Note>
+
+## Enabling a backend
+
+<Steps>
+  <Step title="Open the admin panel">
+    Navigate to **Administration → Storage** in the sidebar.
+  </Step>
+  <Step title="Choose a target">
+    Locate the backend you want to enable and toggle it on.
+  </Step>
+  <Step title="Set the sync mode">
+    Select **Push**, **Pull**, or **Sync** from the mode dropdown (options shown depend on what the backend supports).
+  </Step>
+  <Step title="Fill in the configuration">
+    Enter the credentials and settings specific to that backend (see backend-specific sections below).
+  </Step>
+  <Step title="Save and monitor">
+    Click **Apply Changes**. The sync status and last attempt time appear at the bottom of the page.
+  </Step>
+</Steps>
+
+## Git backend
+
+The Git backend is the most feature-rich option. It connects to any remote Git repository and records every page change as a commit.
+
+<AccordionGroup>
+  <Accordion title="Repository and branch">
+    Set the **Repository URI** to the Git-compliant remote URL. For SSH use the `git@host:org/repo.git` format; for basic (HTTPS) authentication use `https://github.com/org/repo.git`. Set **Branch** to the branch you want to read from and write to (default: `master`).
+  </Accordion>
+  <Accordion title="Authentication">
+    Choose **SSH** (recommended for best security) or **Basic** (username and personal access token).
+
+    For SSH, provide either:
+    - The absolute **path** to an unencrypted private key file on the server, or
+    - The **contents** of the private key pasted directly into the field.
+
+    For basic auth, provide your Git username and a personal access token in the **Password / PAT** field.
+  </Accordion>
+  <Accordion title="Commit author fallback">
+    Wiki.js uses the author of each page change as the Git commit author. If no author can be determined, it falls back to the **Default Author Email** and **Default Author Name** values you configure here.
+  </Accordion>
+  <Accordion title="Sync schedule">
+    The default sync interval is every 5 minutes (`PT5M`). You can override this with any ISO 8601 duration string. Pull and bi-directional modes use this schedule to check the remote for new commits.
+  </Accordion>
+  <Accordion title="Available actions">
+    From the admin panel you can trigger the following actions manually:
+
+    - **Add Untracked Changes** — writes all existing DB content to the local repository, useful when you enable Git after content was already created.
+    - **Force Sync** — runs an immediate sync cycle regardless of the schedule.
+    - **Import Everything** — imports all content currently in the local repository into the database, regardless of commit state.
+    - **Purge Local Repository** — clears the local repository clone without touching the remote. Use this to resolve unrelated merge history errors.
+  </Accordion>
+</AccordionGroup>
+
+## Amazon S3 backend
+
+| Field | Description |
+|---|---|
+| Region | AWS region where the bucket resides (e.g. `us-east-1`). |
+| Unique bucket name | Name of the target S3 bucket (e.g. `wiki-myorg`). |
+| Access Key ID | IAM access key ID with write access to the bucket. |
+| Secret Access Key | Secret key paired with the access key ID above. |
+
+After saving, use the **Export All** action to backfill the bucket with existing content if you enabled S3 after pages were already created.
+
+## Storage target fields (GraphQL)
+
+When querying the storage API, each `StorageTarget` object returns the following fields:
+
+| Field | Type | Description |
+|---|---|---|
+| `key` | `String` | Unique identifier for the backend (e.g. `git`, `s3`). |
+| `title` | `String` | Display name of the backend. |
+| `isEnabled` | `Boolean` | Whether this backend is currently active. |
+| `isAvailable` | `Boolean` | Whether the backend is available in this installation. |
+| `mode` | `String` | Active sync mode (`push`, `pull`, or `sync`). |
+| `supportedModes` | `[String]` | Modes supported by this backend. |
+| `hasSchedule` | `Boolean` | Whether the backend uses a scheduled sync. |
+| `syncInterval` | `String` | Current ISO 8601 sync interval, if applicable. |
+| `config` | `[KeyValuePair]` | Backend-specific configuration values. |
+| `actions` | `[StorageTargetAction]` | List of manual actions available for this backend. |
+
+## Monitoring sync status
+
+The **Storage** page in the admin panel displays the current status for each enabled backend. You can also query status programmatically:
+
+```graphql
+query {
+  storage {
+    status {
+      key
+      title
+      status
+      message
+      lastAttempt
+    }
+  }
+}
+```
+
+Each `StorageStatus` record includes the backend key, its current status string, a human-readable message, and the ISO timestamp of the last sync attempt.
+
+<Tip>
+  If a sync fails repeatedly, check the **Logging** section of the admin panel for error details. Most failures are caused by incorrect credentials or network connectivity issues between the Wiki.js server and the remote endpoint.
+</Tip>

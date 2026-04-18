@@ -1,0 +1,70 @@
+---
+title: "System requirements for Wiki.js"
+description: "Hardware, software, and database requirements to run Wiki.js in production. Covers Node.js version, supported databases, and memory minimums."
+---
+
+Before you install Wiki.js, verify that your server meets the minimum requirements below. Choosing the right database and allocating enough memory up front prevents the most common deployment problems.
+
+## Node.js
+
+Wiki.js requires **Node.js 20 or later**. The `engines` field in `package.json` specifies `>=20`, which means any stable LTS release from Node.js 20 onward is supported. You can check your current version with:
+
+```bash
+node --version
+```
+
+Download the latest LTS release from [nodejs.org](https://nodejs.org) if you need to upgrade.
+
+## Supported databases
+
+Wiki.js needs one of the following database engines. Each entry lists the minimum version required.
+
+| Database engine | Minimum version |
+|---|---|
+| PostgreSQL | 9.5 |
+| MySQL | 8.0 |
+| MariaDB | 10.2.7 |
+| MS SQL Server | 2012 |
+| SQLite | 3.9 |
+
+<Note>
+PostgreSQL is the recommended database for production deployments. It is the only database that supports high-availability mode and is the most thoroughly tested with Wiki.js. SQLite is convenient for testing but is not suitable for multi-user production use.
+</Note>
+
+## Hardware
+
+These are the minimum recommended values for a production server. Requirements scale with the number of concurrent users and the volume of content.
+
+| Resource | Minimum | Recommended |
+|---|---|---|
+| RAM | 1 GB | 2 GB or more |
+| CPU | 1 core | 2 cores or more |
+| Disk | 1 GB | 10 GB or more |
+
+The disk requirement covers the application, its dependencies, and the writable data directory used for file uploads and cache. Actual storage needs depend heavily on how many assets your wiki contains.
+
+## Operating system
+
+Wiki.js runs on any operating system that supports Node.js 20+, including:
+
+- **Linux** — Ubuntu, Debian, CentOS, RHEL, Alpine (recommended for production)
+- **macOS** — Intel and Apple Silicon
+- **Windows** — Windows Server 2016 and later, Windows 10 and later
+
+Linux is the most common production target and offers the best compatibility with containerized deployments.
+
+## Browser support
+
+The Wiki.js interface supports modern browsers. Browsers covered by the project's `browserslist` configuration include:
+
+- Any browser with more than 1% global usage share
+- The last two major versions of all major browsers
+- Firefox ESR (Extended Support Release)
+
+Internet Explorer is explicitly excluded and not supported in any version.
+
+## Network
+
+- Port **3000** must be reachable by users (or the port you configure in `config.yml`)
+- Outbound internet access is required unless you enable [offline mode](/getting-started/configuration)
+- For Let's Encrypt SSL, port **443** must be publicly reachable and port **80** must be open for the ACME challenge

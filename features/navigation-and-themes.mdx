@@ -1,0 +1,209 @@
+---
+title: "Navigation structure and visual themes in Wiki.js"
+description: "Customize the Wiki.js navigation sidebar and header links. Choose and configure visual themes to match your brand or team preferences."
+---
+
+Wiki.js gives you two complementary ways to shape how readers experience your wiki: the **navigation tree**, which controls what links appear in the sidebar, and **themes**, which control the visual appearance of every page. You manage both from the administration panel.
+
+## Navigation
+
+<CardGroup cols={2}>
+  <Card title="Navigation tree" icon="list-tree">
+    A manually curated set of sidebar links organized into a tree. You control exactly what appears and in what order, including links to internal pages, external URLs, and visual dividers.
+  </Card>
+  <Card title="Page tree (automatic)" icon="sitemap">
+    An automatic hierarchy built from page paths. Wiki.js derives the tree from path segments — a page at `guides/api/auth` appears nested under `guides/api`, which is nested under `guides`. No manual configuration needed.
+  </Card>
+</CardGroup>
+
+### Navigation modes
+
+The navigation sidebar can operate in one of four modes, configured under **Administration → Navigation**:
+
+| Mode | Description |
+|------|-------------|
+| `NONE` | No sidebar navigation is shown. |
+| `TREE` | The automatic page tree is shown, derived from page paths. |
+| `STATIC` | Only the manually configured navigation tree is shown. |
+| `MIXED` | Both the manual navigation items and the automatic page tree are shown together. |
+
+### Navigation item types
+
+Each item in the manual navigation tree has a `kind` that determines how it behaves:
+
+| Kind | Description |
+|------|-------------|
+| Link | A clickable link with a label and an optional icon. Can target an internal page path or an external URL. |
+| Divider | A horizontal rule used to visually separate groups of links. |
+
+Items can be nested to create a hierarchy. Each item has the following properties:
+
+| Property | Description |
+|----------|-------------|
+| `id` | Unique identifier for the item |
+| `kind` | `link` or `divider` |
+| `label` | Display text for the link |
+| `icon` | Optional icon name to display alongside the label |
+| `targetType` | Whether the target is an internal page or an external URL |
+| `target` | The URL or page path |
+| `visibilityMode` | Controls which groups can see this item |
+| `visibilityGroups` | List of group IDs that can see this item (when `visibilityMode` is group-restricted) |
+
+### Navigation is per locale
+
+The navigation tree is defined separately for each locale. If your wiki serves content in multiple languages, configure a navigation tree for each locale in use. This allows you to show locale-appropriate section labels and links.
+
+### Managing navigation via the API
+
+Update the full navigation tree (requires `manage:navigation` or `manage:system`):
+
+```graphql
+mutation {
+  navigation {
+    updateTree(tree: [
+      {
+        locale: "en"
+        items: [
+          {
+            id: "home-link"
+            kind: "link"
+            label: "Home"
+            icon: "home"
+            targetType: "internal"
+            target: "/"
+            visibilityMode: "all"
+            visibilityGroups: []
+          },
+          {
+            id: "divider-1"
+            kind: "divider"
+            label: ""
+            icon: ""
+            targetType: ""
+            target: ""
+            visibilityMode: "all"
+            visibilityGroups: []
+          },
+          {
+            id: "docs-link"
+            kind: "link"
+            label: "Documentation"
+            icon: "book"
+            targetType: "internal"
+            target: "docs"
+            visibilityMode: "all"
+            visibilityGroups: []
+          }
+        ]
+      }
+    ]) {
+      responseResult {
+        succeeded
+        message
+      }
+    }
+  }
+}
+```
+
+Switch the navigation mode:
+
+```graphql
+mutation {
+  navigation {
+    updateConfig(mode: MIXED) {
+      responseResult {
+        succeeded
+      }
+    }
+  }
+}
+```
+
+---
+
+## Themes
+
+Visual appearance in Wiki.js is controlled by a theme system. Themes are configured under **Administration → Theme**.
+
+<CardGroup cols={2}>
+  <Card title="Theme selection" icon="palette">
+    Choose from the available themes. The **Default** theme ships with Wiki.js and is production-ready. Additional themes can be installed as modules.
+  </Card>
+  <Card title="Dark mode" icon="moon">
+    Toggle dark mode on or off site-wide. The `darkMode` setting applies to all readers and does not require any additional configuration.
+  </Card>
+  <Card title="Accent color" icon="droplet">
+    The Default theme exposes an **Accent Color** setting that controls the color used in the sidebar navigation and other UI elements. Use any Material Design color (e.g. `blue darken-2`).
+  </Card>
+  <Card title="Table of contents position" icon="list">
+    Configure where the table of contents appears on each page: `left`, `right`, or `hidden`. This can be set at the theme level or overridden per page.
+  </Card>
+</CardGroup>
+
+### Custom CSS and script injection
+
+The theme configuration exposes three injection fields that let you customize the wiki's appearance and behavior without modifying theme files:
+
+| Field | Description |
+|-------|-------------|
+| `injectCSS` | Raw CSS injected into every page. Use it to override default styles or add custom design tokens. |
+| `injectHead` | Raw HTML injected into the `<head>` of every page. Use it to add custom `<meta>` tags, external stylesheets, or analytics scripts. |
+| `injectBody` | Raw HTML injected before the closing `</body>` tag of every page. Use it to add chat widgets, analytics snippets, or other scripts. |
+
+<Warning>
+  Content injected via `injectCSS`, `injectHead`, and `injectBody` is applied globally to every page. Incorrect CSS can break the layout for all readers. Test your changes carefully before saving.
+</Warning>
+
+### Per-page CSS and JavaScript
+
+In addition to global injection, individual pages support their own `scriptCss` and `scriptJs` fields. These are applied only to the specific page, making them useful for one-off styling or interactive elements without affecting the rest of the wiki.
+
+Set them when creating or updating a page via the API, or through the page editor's **Page Properties** panel.
+
+### Iconset
+
+The theme configuration also includes an `iconset` setting that controls which icon library is used throughout the UI. This is set in the admin theme configuration and applies site-wide.
+
+### Configuring themes via the API
+
+Read the current theme configuration (requires `manage:theme` or `manage:system`):
+
+```graphql
+query {
+  theming {
+    config {
+      theme
+      iconset
+      darkMode
+      tocPosition
+      injectCSS
+      injectHead
+      injectBody
+    }
+  }
+}
+```
+
+Update the theme configuration:
+
+```graphql
+mutation {
+  theming {
+    setConfig(
+      theme: "default"
+      iconset: "mdi"
+      darkMode: false
+      tocPosition: "left"
+      injectCSS: "body { font-family: 'Inter', sans-serif; }"
+      injectHead: ""
+      injectBody: ""
+    ) {
+      responseResult {
+        succeeded
+        message
+      }
+    }
+  }
+}
+```

@@ -1,0 +1,113 @@
+---
+title: "Search Engine Integrations for Wiki.js"
+description: "Enable full-text search in Wiki.js with PostgreSQL, Elasticsearch, Algolia, Azure AI Search, AWS CloudSearch, Solr, or Manticore Search."
+---
+
+Wiki.js delegates full-text search to a pluggable search engine. When a visitor uses the search bar, Wiki.js queries whichever engine you have enabled and returns matching page titles and content excerpts. You can choose from a built-in database engine that requires no extra infrastructure, or connect an external engine for more powerful indexing and relevance tuning.
+
+## Supported engines
+
+Only one search engine can be active at a time. Switching engines does not migrate the existing index — you must rebuild the index after changing engines.
+
+| Engine | Key | Available | Description |
+|---|---|---|---|
+| Database (Basic) | `db` | Yes | Default basic search using the application database. No configuration required. |
+| Database (PostgreSQL) | `postgres` | Yes | Advanced full-text search using PostgreSQL's native `tsvector` indexing. Best default choice when running PostgreSQL. |
+| Elasticsearch | `elasticsearch` | Yes | Distributed search engine supporting versions 6.x, 7.x, and 8.x. Suitable for large wikis and clusters. |
+| Algolia | `algolia` | Yes | Hosted search-as-a-service with fast typo-tolerant results. Requires an Algolia account and index. |
+| Azure Search | `azure` | Yes | AI-powered managed search service on Microsoft Azure. |
+| AWS CloudSearch | `aws` | Yes | Managed search service on AWS. Supports multi-language content analysis. |
+| Manticore Search | `manticore` | No | High-performance full-text engine with SQL and JSON support. Not yet available in this release. |
+| Solr | `solr` | No | Apache Lucene-based enterprise search platform. Not yet available in this release. |
+| Sphinx | `sphinx` | No | Open-source full-text search server. Not yet available in this release. |
+
+<Note>
+  Engines marked **No** under Available are bundled in the codebase but not yet functional. Do not enable them in a production environment.
+</Note>
+
+## Choosing an engine
+
+<AccordionGroup>
+  <Accordion title="Database (PostgreSQL) — recommended default">
+    If you are already running Wiki.js on PostgreSQL, this engine requires no additional infrastructure. It uses PostgreSQL's built-in `tsvector` and `tsquery` for full-text search with configurable dictionary language support across 16 languages. Enable it under **Administration → Search Engine** and rebuild the index once.
+  </Accordion>
+  <Accordion title="Database (Basic)">
+    The basic database engine works with any supported database (PostgreSQL, MySQL, MariaDB, MS SQL Server, SQLite). It has no configuration options and is enabled by default on fresh installations. Results are less precise than the PostgreSQL engine.
+  </Accordion>
+  <Accordion title="Elasticsearch">
+    Elasticsearch supports versions 6.x, 7.x, and 8.x. Set the **Elasticsearch Version** field to match the version of the nodes you are connecting to. You can provide multiple hosts as a comma-separated list including credentials (e.g. `https://user:pass@es1.example.com:9200`). The engine also supports cluster sniffing on start and on a configurable polling interval.
+  </Accordion>
+  <Accordion title="Algolia">
+    Algolia is a hosted service that delivers fast, typo-tolerant search results. You need an Algolia application ID, an Admin API Key, and a pre-created index. Algolia's infrastructure handles scaling and ranking automatically. This option is suitable if you want to avoid running your own search cluster.
+  </Accordion>
+  <Accordion title="Azure Search">
+    Provide the Azure Search service name, an admin API key (primary or secondary), and the index name to use. Wiki.js creates the index automatically if it does not exist.
+  </Accordion>
+  <Accordion title="AWS CloudSearch">
+    Provide the search domain name, the document endpoint URL from the AWS console, the region, and IAM credentials with `CloudSearchFullAccess`. You can also configure the analysis scheme language for content indexing.
+  </Accordion>
+</AccordionGroup>
+
+## Enabling and configuring an engine
+
+<Steps>
+  <Step title="Open the search settings">
+    Navigate to **Administration → Search Engine** in the admin sidebar.
+  </Step>
+  <Step title="Select an engine">
+    Click the engine you want to use to expand its settings panel.
+  </Step>
+  <Step title="Toggle it on">
+    Enable the engine with the toggle. Any previously active engine is automatically disabled.
+  </Step>
+  <Step title="Fill in the configuration">
+    Enter the required credentials and settings for the selected engine.
+  </Step>
+  <Step title="Save changes">
+    Click **Apply Changes** to save.
+  </Step>
+  <Step title="Rebuild the index">
+    Click **Rebuild Index** to populate the new engine with all existing page content. This process runs in the background and may take several minutes on large wikis.
+  </Step>
+</Steps>
+
+<Warning>
+  Switching from one search engine to another without rebuilding the index will result in empty or incorrect search results until the rebuild completes.
+</Warning>
+
+## Rebuilding the index
+
+You can trigger an index rebuild at any time from the admin panel or via the GraphQL API:
+
+```graphql
+mutation {
+  search {
+    rebuildIndex {
+      responseResult {
+        succeeded
+        message
+      }
+    }
+  }
+}
+```
+
+The rebuild re-indexes all pages currently in the database. Use this after a bulk import, after re-enabling a search engine, or when search results appear stale.
+
+## SearchEngine fields (GraphQL)
+
+When querying available engines, each `SearchEngine` object exposes:
+
+| Field | Type | Description |
+|---|---|---|
+| `key` | `String` | Unique identifier (e.g. `postgres`, `elasticsearch`). |
+| `title` | `String` | Display name of the engine. |
+| `isEnabled` | `Boolean` | Whether this engine is currently active. |
+| `isAvailable` | `Boolean` | Whether the engine is functional in this release. |
+| `description` | `String` | Short description of the engine. |
+| `website` | `String` | Link to the engine's official website. |
+| `config` | `[KeyValuePair]` | Engine-specific configuration values. |
+
+<Tip>
+  For most self-hosted installations running PostgreSQL, the **Database (PostgreSQL)** engine is the best starting point. It delivers solid full-text search quality without any external dependencies.
+</Tip>

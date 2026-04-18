@@ -1,0 +1,149 @@
+---
+title: "Configure a Reverse Proxy for Wiki.js"
+description: "Serve Wiki.js behind nginx, Apache, or Caddy with SSL termination. Covers WebSocket proxying for real-time features and trust proxy settings."
+---
+
+Running Wiki.js directly on port 3000 is fine for local testing, but production deployments benefit from a reverse proxy sitting in front. A reverse proxy lets you serve traffic on standard ports 80 and 443, terminate TLS, enforce HTTPS redirects, and add rate limiting or caching without modifying Wiki.js itself. Wiki.js uses WebSockets for real-time editor collaboration and live notifications, so your proxy configuration must forward WebSocket upgrade requests in addition to regular HTTP traffic.
+
+## Why use a reverse proxy
+
+- Terminate TLS at the proxy; Wiki.js runs plain HTTP internally on port 3000.
+- Serve on port 80 and 443 without running Wiki.js as root.
+- Use a custom domain name with automatic certificate renewal.
+- Add HTTP/2 support and response compression at the proxy layer.
+- Place multiple services behind a single IP address with name-based virtual hosting.
+
+## Trust proxy setting
+
+When Wiki.js sits behind a reverse proxy, it sees the proxy's IP address instead of the real client IP. Enable the trust proxy setting so that Wiki.js correctly reads the `X-Forwarded-For` and `X-Forwarded-Proto` headers forwarded by your proxy. Add the following line to your `config.yml`:
+
+```yaml config.yml
+securityTrustProxy: true
+```
+
+Restart Wiki.js after changing this setting.
+
+## Proxy configuration examples
+
+<Tabs>
+  <Tab title="nginx">
+
+The nginx configuration below redirects HTTP to HTTPS and proxies all requests—including WebSocket upgrades—to Wiki.js on `localhost:3000`.
+
+```nginx /etc/nginx/sites-available/wiki
+server {
+    listen 80;
+    server_name wiki.example.com;
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name wiki.example.com;
+
+    ssl_certificate     /path/to/cert.pem;
+    ssl_certificate_key /path/to/key.pem;
+
+    location / {
+        proxy_pass http://localhost:3000;
+        proxy_set_header Host              $host;
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        # WebSocket support
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade    $http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+}
+```
+
+Enable the site and reload nginx:
+
+```bash
+sudo ln -s /etc/nginx/sites-available/wiki /etc/nginx/sites-enabled/wiki
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+  </Tab>
+  <Tab title="Apache">
+
+The Apache configuration requires `mod_proxy`, `mod_proxy_http`, and `mod_proxy_wstunnel`. Enable them first:
+
+```bash
+sudo a2enmod proxy proxy_http proxy_wstunnel headers rewrite ssl
+sudo systemctl restart apache2
+```
+
+```apache /etc/apache2/sites-available/wiki.conf
+<VirtualHost *:80>
+    ServerName wiki.example.com
+    RewriteEngine On
+    RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+</VirtualHost>
+
+<VirtualHost *:443>
+    ServerName wiki.example.com
+
+    SSLEngine on
+    SSLCertificateFile    /path/to/cert.pem
+    SSLCertificateKeyFile /path/to/key.pem
+
+    # Standard HTTP proxy
+    ProxyPreserveHost On
+    ProxyPass        / http://localhost:3000/
+    ProxyPassReverse / http://localhost:3000/
+
+    # WebSocket proxy
+    RewriteEngine On
+    RewriteCond %{HTTP:Upgrade} websocket [NC]
+    RewriteCond %{HTTP:Connection} upgrade [NC]
+    RewriteRule ^/?(.*) "ws://localhost:3000/$1" [P,L]
+
+    RequestHeader set X-Forwarded-Proto "https"
+</VirtualHost>
+```
+
+Enable the site and reload Apache:
+
+```bash
+sudo a2ensite wiki
+sudo systemctl reload apache2
+```
+
+  </Tab>
+  <Tab title="Caddy">
+
+Caddy automatically provisions and renews TLS certificates via Let's Encrypt. The `reverse_proxy` directive handles both HTTP and WebSocket connections without extra configuration.
+
+```caddy Caddyfile
+wiki.example.com {
+    reverse_proxy localhost:3000
+}
+```
+
+Start or reload Caddy:
+
+```bash
+sudo systemctl reload caddy
+```
+
+Caddy detects WebSocket upgrade requests automatically and proxies them correctly.
+
+  </Tab>
+</Tabs>
+
+## WebSocket support
+
+<Warning>
+WebSocket proxying is required for Wiki.js real-time features including the live editor, presence indicators, and server-side events. If WebSocket connections are blocked or dropped by your proxy, editors will not receive live updates and may encounter errors when saving pages.
+</Warning>
+
+Verify that WebSocket connections reach Wiki.js by opening your browser's developer tools, navigating to the Network tab, and filtering by "WS". You should see an established WebSocket connection to your domain after loading a Wiki.js page.
+
+## SSL termination
+
+Wiki.js does not need to handle TLS directly when a reverse proxy terminates SSL. Leave the `ssl.enabled` option set to `false` in `config.yml` (the default). The proxy presents the certificate to clients and forwards decrypted HTTP traffic to Wiki.js on port 3000. This is the recommended setup for most deployments.
+
+If you prefer to have Wiki.js manage its own certificate (for example, in environments without a proxy), see the `ssl` section in `config.sample.yml` for the available options including Let's Encrypt and custom PEM/PFX certificates.

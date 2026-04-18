@@ -1,0 +1,248 @@
+---
+title: "Authenticate with the Wiki.js API"
+description: "Get a JWT token by logging in or create a long-lived API key. Pass credentials in the Authorization header on every GraphQL request."
+---
+
+Every request to the Wiki.js GraphQL API must include a valid Bearer token in the `Authorization` header. You can obtain a token in two ways: by calling the `login` mutation to get a short-lived JWT, or by creating a long-lived API key from the admin panel. Choose the method that fits your use case — JWTs are better for user sessions, while API keys are simpler for automated scripts and integrations.
+
+## Method 1: Login mutation (JWT)
+
+Call the `login` mutation with a username, password, and the authentication strategy key (for example, `"local"` for the built-in local strategy). On success, the response includes a `jwt` field containing a signed token.
+
+<Warning>
+  The `login` mutation is rate-limited to **5 attempts per 60 seconds** per IP address to prevent brute-force attacks.
+</Warning>
+
+```graphql
+mutation {
+  authentication {
+    login(username: "admin@example.com", password: "yourpassword", strategy: "local") {
+      responseResult {
+        succeeded
+        errorCode
+        message
+      }
+      jwt
+      mustChangePwd
+      mustProvideTFA
+      mustSetupTFA
+      continuationToken
+    }
+  }
+}
+```
+
+### Login response fields
+
+| Field | Type | Description |
+|---|---|---|
+| `responseResult.succeeded` | `Boolean` | `true` when login succeeded |
+| `responseResult.errorCode` | `Int` | Error code when login failed |
+| `responseResult.message` | `String` | Human-readable error message |
+| `jwt` | `String` | Signed JWT token to use in subsequent requests |
+| `mustChangePwd` | `Boolean` | User must change their password before continuing |
+| `mustProvideTFA` | `Boolean` | User must complete a TFA challenge |
+| `mustSetupTFA` | `Boolean` | User must set up TFA before continuing |
+| `continuationToken` | `String` | Opaque token for multi-step login flows (TFA, password change) |
+| `redirect` | `String` | URL to redirect after login, if configured |
+| `tfaQRImage` | `String` | Base64 QR code image for TFA setup |
+
+### Two-factor authentication
+
+When `mustProvideTFA` is `true`, call `loginTFA` with the `continuationToken` from the initial login response and the user's security code.
+
+```graphql
+mutation {
+  authentication {
+    loginTFA(
+      continuationToken: "CONTINUATION_TOKEN"
+      securityCode: "123456"
+      setup: false
+    ) {
+      responseResult { succeeded errorCode message }
+      jwt
+    }
+  }
+}
+```
+
+### Forced password change
+
+When `mustChangePwd` is `true`, call `loginChangePassword` before you can get a usable JWT.
+
+```graphql
+mutation {
+  authentication {
+    loginChangePassword(
+      continuationToken: "CONTINUATION_TOKEN"
+      newPassword: "NewSecurePassword123!"
+    ) {
+      responseResult { succeeded errorCode message }
+      jwt
+    }
+  }
+}
+```
+
+### JWT expiration and renewal
+
+JWTs expire based on the site's `authJwtExpiration` setting (default: `30m`). The `authJwtRenewablePeriod` setting controls how long before expiration a token can be renewed. To renew, call `users { changePassword }` or `users { updateProfile }` — both mutations return a fresh `jwt` in the `UserTokenResponse`.
+
+## Method 2: API keys (long-lived)
+
+API keys do not expire unless you set an expiration date or revoke them manually. They are ideal for CI/CD pipelines, bots, and server-to-server integrations.
+
+### Creating an API key from the admin panel
+
+<Steps>
+  <Step title="Open the admin panel">
+    Navigate to **Admin → API Keys** in your Wiki.js instance.
+  </Step>
+  <Step title="Enable the API">
+    Toggle the API on if it is currently disabled.
+  </Step>
+  <Step title="Create a new key">
+    Click **Add API Key**, enter a name and expiration date, then choose whether the key has full access or is scoped to a group.
+  </Step>
+  <Step title="Copy the key">
+    The full key is only shown once. Copy it and store it securely.
+  </Step>
+</Steps>
+
+### Creating an API key via GraphQL
+
+You can also create keys programmatically if you already have a `manage:system` or `manage:api` token.
+
+<ParamField body="name" type="string" required>
+  A descriptive label for the key. Shown in the admin panel.
+</ParamField>
+
+<ParamField body="expiration" type="string" required>
+  ISO 8601 date string for when the key expires (e.g., `"2027-01-01T00:00:00.000Z"`). Pass a far-future date for keys that should not expire in practice.
+</ParamField>
+
+<ParamField body="fullAccess" type="boolean" required>
+  When `true`, the key has `manage:system` level access. When `false`, the key is scoped to the group specified by `group`.
+</ParamField>
+
+<ParamField body="group" type="number">
+  Group ID that controls this key's permissions when `fullAccess` is `false`.
+</ParamField>
+
+```graphql
+mutation {
+  authentication {
+    createApiKey(
+      name: "CI/CD Deploy Key"
+      expiration: "2027-12-31T23:59:59.000Z"
+      fullAccess: false
+      group: 2
+    ) {
+      responseResult { succeeded errorCode message }
+      key
+    }
+  }
+}
+```
+
+The `key` field in the response is the raw API key string. Store it securely — it is not retrievable after this response.
+
+### Listing API keys
+
+```graphql
+{
+  authentication {
+    apiKeys {
+      id
+      name
+      keyShort
+      expiration
+      createdAt
+      updatedAt
+      isRevoked
+    }
+  }
+}
+```
+
+| Field | Type | Description |
+|---|---|---|
+| `id` | `Int` | Key ID, used to revoke it |
+| `name` | `String` | Label assigned at creation |
+| `keyShort` | `String` | Truncated key suffix for identification |
+| `expiration` | `Date` | Expiration timestamp |
+| `isRevoked` | `Boolean` | Whether the key has been revoked |
+
+### Revoking an API key
+
+```graphql
+mutation {
+  authentication {
+    revokeApiKey(id: 3) {
+      responseResult { succeeded errorCode message }
+    }
+  }
+}
+```
+
+### Enabling or disabling the API globally
+
+```graphql
+mutation {
+  authentication {
+    setApiState(enabled: true) {
+      responseResult { succeeded errorCode message }
+    }
+  }
+}
+```
+
+## Using the token
+
+Include the token as a Bearer token in the `Authorization` header of every request, regardless of whether it is a JWT or an API key.
+
+```bash
+curl -X POST https://wiki.example.com/graphql \
+  -H "Authorization: Bearer YOUR_TOKEN_HERE" \
+  -H "Content-Type: application/json" \
+  -d '{"query": "{ pages { list { id title path } } }"}'
+```
+
+## Other authentication operations
+
+### Self-registration
+
+Users can register their own accounts with the `register` mutation (if self-registration is enabled for a strategy):
+
+```graphql
+mutation {
+  authentication {
+    register(
+      email: "newuser@example.com"
+      password: "SecurePassword123!"
+      name: "New User"
+    ) {
+      responseResult { succeeded errorCode message }
+      jwt
+    }
+  }
+}
+```
+
+### Password reset
+
+Trigger a password reset email for a given address:
+
+```graphql
+mutation {
+  authentication {
+    forgotPassword(email: "user@example.com") {
+      responseResult { succeeded errorCode message }
+    }
+  }
+}
+```
+
+<Note>
+  The `forgotPassword` mutation is rate-limited to 3 attempts per 60 seconds.
+</Note>

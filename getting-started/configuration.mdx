@@ -1,0 +1,301 @@
+---
+title: "Configure Wiki.js with config.yml"
+description: "All config.yml settings for Wiki.js: database connection, SSL, port binding, logging, high-availability mode, and body parser limits."
+---
+
+Wiki.js reads its runtime configuration from a file named `config.yml` in the application root directory. You create this file by copying `config.sample.yml`, which ships with every release and contains every available option alongside inline comments.
+
+The settings below cover all supported keys. Most deployments only need to configure the `db` section and `port`. The advanced options at the bottom are safe to leave at their defaults unless you have a specific requirement.
+
+<AccordionGroup>
+
+<Accordion title="port — server port">
+
+Sets the TCP port that Wiki.js listens on.
+
+```yaml config.yml
+port: 3000
+```
+
+**Default:** `3000`
+
+Change this if port 3000 is already in use on your server, or if you want Wiki.js to listen on a privileged port such as 80. When running behind a reverse proxy, you can leave this at `3000` and have the proxy handle the public-facing port.
+
+</Accordion>
+
+<Accordion title="db — database connection">
+
+The `db` section configures how Wiki.js connects to your database. The `type` key selects the database engine; the remaining keys vary by engine.
+
+```yaml config.yml
+db:
+  type: postgres        # postgres | mysql | mariadb | mssql | sqlite
+
+  # PostgreSQL / MySQL / MariaDB / MS SQL Server
+  host: localhost
+  port: 5432
+  user: wikijs
+  pass: wikijsrocks
+  db: wiki
+  ssl: false
+```
+
+**Supported `type` values:**
+
+| Value | Database engine | Minimum version |
+|---|---|---|
+| `postgres` | PostgreSQL | 9.5 |
+| `mysql` | MySQL | 8.0 |
+| `mariadb` | MariaDB | 10.2.7 |
+| `mssql` | MS SQL Server | 2012 |
+| `sqlite` | SQLite | 3.9 |
+
+**SSL connection (`ssl` and `sslOptions`):**
+
+Set `ssl: true` to enable an encrypted connection to your database server. By default Wiki.js uses the Node.js TLS defaults, which include certificate verification. You can fine-tune TLS behaviour with `sslOptions`:
+
+```yaml config.yml
+db:
+  type: postgres
+  host: db.example.com
+  port: 5432
+  user: wikijs
+  pass: wikijsrocks
+  db: wiki
+  ssl: true
+
+  sslOptions:
+    auto: true                   # Set to false to use manual options below
+    # rejectUnauthorized: false  # Disable cert verification (not recommended)
+    # ca: path/to/ca.crt
+    # cert: path/to/cert.crt
+    # key: path/to/key.pem
+    # pfx: path/to/cert.pfx
+    # passphrase: xyz123
+```
+
+`sslOptions` applies to PostgreSQL, MySQL, and MariaDB only. The full list of accepted TLS options is documented in the [Node.js TLS documentation](https://nodejs.org/api/tls.html#tls_tls_createsecurecontext_options).
+
+**PostgreSQL schema:**
+
+```yaml config.yml
+db:
+  type: postgres
+  schema: public    # Default is "public"
+```
+
+Use `schema` to deploy Wiki.js into a non-default PostgreSQL schema.
+
+**SQLite storage path:**
+
+```yaml config.yml
+db:
+  type: sqlite
+  storage: path/to/database.sqlite
+```
+
+For SQLite, omit `host`, `port`, `user`, `pass`, and `db`. Specify only `storage` with the path to your `.sqlite` file.
+
+</Accordion>
+
+<Accordion title="ssl — HTTPS / TLS termination">
+
+Wiki.js can terminate HTTPS directly without a reverse proxy. This is disabled by default.
+
+```yaml config.yml
+ssl:
+  enabled: false
+  port: 3443
+  provider: custom    # custom | letsencrypt
+```
+
+<Note>
+For most production deployments, running Wiki.js behind a reverse proxy such as nginx or Caddy is simpler and more flexible than enabling built-in TLS. Use this section only when a reverse proxy is not an option.
+</Note>
+
+**Custom certificates (PEM format):**
+
+```yaml config.yml
+ssl:
+  enabled: true
+  port: 3443
+  provider: custom
+  format: pem
+  key: path/to/key.pem
+  cert: path/to/cert.pem
+  passphrase: null      # Set if your key is encrypted
+  dhparam: null         # Optional DH parameters file (>= 1024-bit key)
+```
+
+**Custom certificates (PFX format):**
+
+```yaml config.yml
+ssl:
+  enabled: true
+  port: 3443
+  provider: custom
+  format: pfx
+  pfx: path/to/cert.pfx
+  passphrase: null
+```
+
+**Let's Encrypt (automatic certificate):**
+
+```yaml config.yml
+ssl:
+  enabled: true
+  port: 3443
+  provider: letsencrypt
+  domain: wiki.yourdomain.com
+  subscriberEmail: admin@example.com
+```
+
+When using Let's Encrypt, your server must be publicly reachable on port 443 and port 80 must be open for the ACME HTTP-01 challenge.
+
+</Accordion>
+
+<Accordion title="pool — database connection pool">
+
+Controls the minimum and maximum number of simultaneous database connections Wiki.js maintains. These values are passed directly to [tarn.js](https://github.com/vincit/tarn.js).
+
+```yaml config.yml
+pool:
+  min: 2
+  max: 10
+```
+
+**Default:** Both `min` and `max` are commented out in `config.sample.yml`, meaning tarn.js uses its own defaults. Uncomment and adjust these values if you need to limit database connections on a constrained server or increase throughput on a high-traffic instance.
+
+</Accordion>
+
+<Accordion title="bindIP — network interface binding">
+
+Sets the IP address Wiki.js listens on. The default `0.0.0.0` binds to all available network interfaces.
+
+```yaml config.yml
+bindIP: 0.0.0.0
+```
+
+Set this to a specific IP address to restrict Wiki.js to a single network interface — useful when your server has multiple NICs and you want to expose Wiki.js only on an internal network.
+
+</Accordion>
+
+<Accordion title="logLevel and logFormat — logging">
+
+**`logLevel`** controls the minimum severity of messages written to the log. Messages at or above the configured level are emitted; lower-severity messages are suppressed.
+
+```yaml config.yml
+logLevel: info
+```
+
+Accepted values, from most to least verbose:
+
+| Value | Description |
+|---|---|
+| `silly` | All internal trace messages |
+| `debug` | Detailed debugging information |
+| `verbose` | Extra operational detail |
+| `info` | General operational messages (default) |
+| `warn` | Non-fatal conditions that deserve attention |
+| `error` | Error conditions only |
+
+**`logFormat`** sets the output format for log lines.
+
+```yaml config.yml
+logFormat: default
+```
+
+| Value | Description |
+|---|---|
+| `default` | Human-readable text output |
+| `json` | Structured JSON — suitable for log aggregation tools such as Elasticsearch or Datadog |
+
+</Accordion>
+
+<Accordion title="offline — air-gapped mode">
+
+Set `offline: true` if your server has no outbound internet access. In offline mode, Wiki.js skips network calls for assets and extension data that would normally be fetched from the internet.
+
+```yaml config.yml
+offline: false
+```
+
+**Default:** `false`
+
+When offline mode is enabled, you must manually download and sideload any modules, themes, or locales that Wiki.js would otherwise retrieve automatically.
+
+</Accordion>
+
+<Accordion title="ha — high-availability mode">
+
+Enables coordination between multiple Wiki.js instances sharing a single PostgreSQL database.
+
+```yaml config.yml
+ha: false
+```
+
+**Default:** `false`
+
+Set `ha: true` when you run Wiki.js as multiple concurrent instances behind a load balancer — for example, as Kubernetes pods or replicated containers. High-availability mode uses PostgreSQL's `LISTEN`/`NOTIFY` mechanism to keep instances in sync.
+
+<Warning>
+High-availability mode requires **PostgreSQL**. It is not supported with MySQL, MariaDB, MS SQL Server, or SQLite.
+</Warning>
+
+</Accordion>
+
+<Accordion title="dataPath — writable data directory">
+
+Sets the path to a writable directory that Wiki.js uses for cache files and temporary user uploads.
+
+```yaml config.yml
+dataPath: ./data
+```
+
+**Default:** `./data` (relative to the application root)
+
+Set this to an absolute path if you want to store data outside the application directory — for example, on a separate volume in a containerized deployment. Wiki.js creates the directory and required subdirectories (`cache/`, `uploads/`) on first startup.
+
+</Accordion>
+
+<Accordion title="bodyParserLimit — maximum request body size">
+
+Sets the maximum size of API request bodies that Wiki.js will parse. This limit does not apply to file uploads.
+
+```yaml config.yml
+bodyParserLimit: 5mb
+```
+
+**Default:** `5mb`
+
+Increase this value if you encounter request body size errors when saving very large pages. The value accepts any size string recognized by the [bytes](https://www.npmjs.com/package/bytes) library, such as `10mb` or `1gb`.
+
+</Accordion>
+
+</AccordionGroup>
+
+## Complete minimal example
+
+The following `config.yml` covers the most common production scenario — Wiki.js with a PostgreSQL database, running on the default port:
+
+```yaml config.yml
+port: 3000
+
+db:
+  type: postgres
+  host: localhost
+  port: 5432
+  user: wikijs
+  pass: yourpassword
+  db: wiki
+  ssl: false
+
+logLevel: info
+logFormat: default
+offline: false
+ha: false
+dataPath: ./data
+bodyParserLimit: 5mb
+```
+
+Start from `config.sample.yml` and uncomment only the sections you need. All unset options use the defaults documented above.

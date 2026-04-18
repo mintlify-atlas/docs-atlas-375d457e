@@ -1,0 +1,74 @@
+---
+title: "Storage backends for Wiki.js content"
+description: "Connect Wiki.js to external storage. Sync page content and assets to Git, AWS S3, Azure Blob, Google Drive, Dropbox, SFTP, or local disk."
+---
+
+Wiki.js can replicate your pages and uploaded assets to one or more external storage targets. This lets you maintain off-site backups, push content into version control, or integrate with cloud object storage. Multiple backends can be active simultaneously, and each one is configured independently under **Administration → Storage**.
+
+## Available backends
+
+| Backend | Key | Description |
+|---|---|---|
+| Azure Blob Storage | `azure` | Microsoft Azure Blob Storage container |
+| Box | `box` | Box cloud storage |
+| DigitalOcean Spaces | `digitalocean` | S3-compatible object storage on DigitalOcean |
+| Local disk | `disk` | Directory on the server's filesystem |
+| Dropbox | `dropbox` | Dropbox account folder |
+| Google Drive | `gdrive` | Google Drive folder |
+| Git | `git` | Remote Git repository (GitHub, GitLab, Gitea, etc.) |
+| OneDrive | `onedrive` | Microsoft OneDrive |
+| AWS S3 | `s3` | Amazon S3 bucket |
+| S3-compatible | `s3generic` | Any S3-compatible endpoint (MinIO, Wasabi, etc.) |
+| SFTP | `sftp` | SSH file transfer over SFTP |
+
+## Sync modes
+
+Each backend that supports scheduled synchronisation exposes a `mode` field. The available modes are:
+
+- **Push** — Wiki.js writes content to the backend. Changes made externally in the backend are ignored.
+- **Pull** — Wiki.js reads content from the backend and imports it. Local edits are overwritten on the next sync.
+- **Bi-directional** — Wiki.js both writes to and reads from the backend. Conflicts are resolved in favour of the most recent change.
+
+Not every backend supports all three modes. The `supportedModes` field on each target lists which modes are available.
+
+## Sync interval
+
+For backends that support scheduled syncing (`hasSchedule: true`), you set a `syncInterval` using a cron expression. If you leave this blank, the backend's `syncIntervalDefault` is used. You can also trigger an immediate sync using the **Execute Action** button next to the backend in the admin panel.
+
+<Note>
+  The local disk backend does not use a sync interval — writes happen synchronously as pages are saved.
+</Note>
+
+## Git backend
+
+The Git backend is the most commonly used storage module because it provides full version history, branching, and the ability to edit pages outside Wiki.js using standard text editors.
+
+Key configuration fields for the Git backend include:
+
+- **Repository URL** — HTTPS or SSH URL of the remote repository.
+- **Branch** — the branch that Wiki.js reads from and writes to.
+- **Authentication** — SSH key or username-and-password credentials for the remote.
+- **Local repository path** — where Wiki.js clones the repository on disk.
+- **Committer name and email** — used as the author on auto-generated commits.
+
+<Tip>
+  Use a dedicated service account or deploy key with write access to the repository. This keeps the wiki's commit history separate from human contributors and makes it easier to audit automated changes.
+</Tip>
+
+When bi-directional mode is active, the Git backend commits every page save as a separate commit. Pull requests or direct pushes to the same branch by other contributors are merged into the local clone on the next sync cycle.
+
+## Storage status
+
+The **Status** panel at the top of **Administration → Storage** shows the current health of every active backend:
+
+| Field | Description |
+|---|---|
+| `status` | `ok`, `pending`, or `error` |
+| `message` | Human-readable description of the last operation result |
+| `lastAttempt` | Timestamp of the most recent sync attempt |
+
+If a backend reports an error, check the Wiki.js server logs for a full stack trace. Common causes include expired credentials, unreachable endpoints, and insufficient permissions on the target bucket or repository.
+
+<Warning>
+  Disabling a storage backend does not delete content already synced to that target. If you re-enable the backend later with bi-directional mode, Wiki.js will attempt to reconcile the state of the remote with the current database. Review the content at the target before re-enabling to avoid unintended imports.
+</Warning>

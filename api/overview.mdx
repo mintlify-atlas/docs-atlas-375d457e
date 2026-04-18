@@ -1,0 +1,156 @@
+---
+title: "Wiki.js GraphQL API Overview"
+description: "Wiki.js exposes a GraphQL API at /graphql. All operations use POST requests with JSON bodies. Authenticate with a JWT token or API key."
+---
+
+Wiki.js exposes a single GraphQL endpoint that you use for every read and write operation. All requests go to `POST /graphql` with a JSON body containing your query or mutation. You can also open `/graphql` in a browser to access the interactive GraphQL playground, which lets you explore the schema and run operations without writing any code.
+
+## Endpoint
+
+| Detail | Value |
+|---|---|
+| URL | `https://your-wiki.example.com/graphql` |
+| Method | `POST` (all API operations) |
+| Content-Type | `application/json` |
+| Playground | `GET https://your-wiki.example.com/graphql` |
+
+## Authentication
+
+Every request must include an `Authorization` header with a Bearer token. Wiki.js supports two token types:
+
+- **JWT** — short-lived token obtained by calling the `login` mutation. Expires according to your site's `authJwtExpiration` setting.
+- **API key** — long-lived token created from the admin panel under **Admin → API Keys**. Suitable for automated scripts and integrations.
+
+```http
+Authorization: Bearer YOUR_TOKEN_HERE
+```
+
+See the [authentication reference](/api/authentication) for how to obtain and renew tokens.
+
+## Request format
+
+Send a `POST` request with a JSON body containing a `query` field and an optional `variables` field.
+
+```bash
+curl -X POST https://wiki.example.com/graphql \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"query": "{ pages { list { id title path } } }"}'
+```
+
+Using variables (recommended for mutations):
+
+```bash
+curl -X POST https://wiki.example.com/graphql \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "mutation CreatePage($title: String!, $path: String!, $content: String!, $locale: String!, $description: String!, $editor: String!, $isPublished: Boolean!, $isPrivate: Boolean!, $tags: [String]!) { pages { create(title: $title, path: $path, content: $content, locale: $locale, description: $description, editor: $editor, isPublished: $isPublished, isPrivate: $isPrivate, tags: $tags) { responseResult { succeeded errorCode message } page { id } } } }",
+    "variables": {
+      "title": "My New Page",
+      "path": "my-new-page",
+      "content": "# Hello World",
+      "locale": "en",
+      "description": "A test page",
+      "editor": "markdown",
+      "isPublished": true,
+      "isPrivate": false,
+      "tags": []
+    }
+  }'
+```
+
+## Response format
+
+All responses follow the standard GraphQL envelope with a `data` field and an optional `errors` array.
+
+```json
+{
+  "data": {
+    "pages": {
+      "list": [
+        { "id": 1, "title": "Home", "path": "home" }
+      ]
+    }
+  }
+}
+```
+
+When an error occurs, GraphQL returns it in the `errors` array:
+
+```json
+{
+  "errors": [
+    {
+      "message": "Unauthorized",
+      "locations": [{ "line": 1, "column": 3 }],
+      "path": ["pages", "list"]
+    }
+  ],
+  "data": null
+}
+```
+
+## Mutation responses
+
+Every mutation returns a `responseResult` object containing a `succeeded` boolean, an `errorCode` integer, a `slug` string identifier, and an optional human-readable `message`. Always check `succeeded` before using the rest of the response.
+
+```graphql
+type ResponseStatus {
+  succeeded: Boolean!
+  errorCode: Int!
+  slug: String!
+  message: String
+}
+```
+
+Example mutation response:
+
+```json
+{
+  "data": {
+    "pages": {
+      "create": {
+        "responseResult": {
+          "succeeded": true,
+          "errorCode": 0,
+          "slug": "PageCreateSuccess",
+          "message": null
+        },
+        "page": { "id": 42 }
+      }
+    }
+  }
+}
+```
+
+## Rate limiting
+
+Some mutations are rate-limited to prevent abuse. The `login`, `loginTFA`, and `loginChangePassword` mutations allow **5 attempts per 60 seconds** per IP address. The `forgotPassword` mutation allows **3 attempts per 60 seconds**. Exceeding the limit returns an error in the `errors` array.
+
+## Permissions
+
+Most queries and mutations require specific permissions. Permissions are granted through groups. The `manage:system` permission grants access to all operations. More targeted permissions include `read:pages`, `write:pages`, `manage:pages`, `read:assets`, `write:assets`, `manage:assets`, `write:users`, `manage:users`, `write:groups`, `manage:groups`, `read:source`, `read:history`, and `manage:api`.
+
+## API reference pages
+
+<CardGroup cols={2}>
+  <Card title="Authentication" icon="key" href="/api/authentication">
+    Log in, manage API keys, and handle two-factor authentication.
+  </Card>
+  <Card title="Pages" icon="file-text" href="/api/pages">
+    Create, read, update, delete, and search wiki pages.
+  </Card>
+  <Card title="Users" icon="user" href="/api/users">
+    Manage user accounts, profiles, and TFA settings.
+  </Card>
+  <Card title="Groups" icon="users" href="/api/groups">
+    Create groups, assign permissions, and manage members.
+  </Card>
+  <Card title="Assets" icon="paperclip" href="/api/assets">
+    List, upload, rename, and delete file assets.
+  </Card>
+  <Card title="Site configuration" icon="settings" href="/api/site">
+    Read and update site-wide settings.
+  </Card>
+</CardGroup>

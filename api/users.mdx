@@ -1,0 +1,205 @@
+---
+title: "Users GraphQL API Reference"
+description: "Manage Wiki.js user accounts via GraphQL. List users, create accounts, update profiles, toggle TFA, activate or deactivate users, and reset passwords."
+---
+
+The Users API gives administrators full programmatic control over user accounts. You can list users, create new accounts, update profile fields, manage two-factor authentication, and handle account lifecycle operations like activation and deactivation.
+
+<Note>
+Most user management mutations require the `manage:users` or `manage:system` permission. The `profile` query and `updateProfile`/`changePassword` mutations are available to any authenticated user.
+</Note>
+
+## Queries
+
+### `list` — List all users
+
+```graphql
+query {
+  users {
+    list(filter: "john", orderBy: "name") {
+      id
+      name
+      email
+      providerKey
+      isActive
+      isSystem
+      createdAt
+      lastLoginAt
+    }
+  }
+}
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `filter` | `String` | Optional text filter on name or email |
+| `orderBy` | `String` | Field to sort by |
+
+### `single` — Get a user by ID
+
+```graphql
+query {
+  users {
+    single(id: 5) {
+      id
+      name
+      email
+      providerKey
+      providerName
+      isActive
+      isVerified
+      tfaIsActive
+      location
+      jobTitle
+      timezone
+      groups { id name }
+      createdAt
+      lastLoginAt
+    }
+  }
+}
+```
+
+### `profile` — Get the current user's profile
+
+```graphql
+query {
+  users {
+    profile {
+      id
+      name
+      email
+      groups
+      pagesTotal
+      location
+      jobTitle
+      timezone
+    }
+  }
+}
+```
+
+---
+
+## Mutations
+
+### `create` — Create a new user
+
+```graphql
+mutation {
+  users {
+    create(
+      email: "jane@example.com"
+      name: "Jane Smith"
+      providerKey: "local"
+      groups: [2]
+      mustChangePassword: true
+      sendWelcomeEmail: true
+    ) {
+      responseResult { succeeded errorCode message }
+      user { id email }
+    }
+  }
+}
+```
+
+<ParamField path="email" type="String" required>
+  User's email address. Must be unique.
+</ParamField>
+<ParamField path="name" type="String" required>
+  Display name.
+</ParamField>
+<ParamField path="providerKey" type="String" required>
+  Authentication provider key (e.g. `local`). Use `local` for password-based accounts.
+</ParamField>
+<ParamField path="groups" type="[Int]" required>
+  Array of group IDs to assign the user to.
+</ParamField>
+<ParamField path="passwordRaw" type="String">
+  Initial password (local provider only). If omitted, user must reset via email.
+</ParamField>
+<ParamField path="mustChangePassword" type="Boolean">
+  Force a password change on first login.
+</ParamField>
+<ParamField path="sendWelcomeEmail" type="Boolean">
+  Send a welcome email with login instructions.
+</ParamField>
+
+### `update` — Update a user
+
+```graphql
+mutation {
+  users {
+    update(
+      id: 5
+      name: "Jane Doe"
+      timezone: "America/New_York"
+      groups: [2, 3]
+    ) {
+      responseResult { succeeded errorCode message }
+    }
+  }
+}
+```
+
+All fields except `id` are optional.
+
+### `delete` — Delete a user
+
+```graphql
+mutation {
+  users {
+    delete(id: 5, replaceId: 1) {
+      responseResult { succeeded errorCode message }
+    }
+  }
+}
+```
+
+`replaceId` is required — pages authored by the deleted user are reassigned to this user ID.
+
+### Account lifecycle mutations
+
+| Mutation | Description |
+|----------|-------------|
+| `activate(id)` | Activate a suspended user account |
+| `deactivate(id)` | Deactivate a user (they cannot log in) |
+| `verify(id)` | Mark a user as email-verified |
+| `resetPassword(id)` | Send a password reset email |
+| `enableTFA(id)` | Enable two-factor authentication for a user |
+| `disableTFA(id)` | Disable two-factor authentication for a user |
+
+### `updateProfile` — Update own profile
+
+Available to any authenticated user without admin permissions.
+
+```graphql
+mutation {
+  users {
+    updateProfile(
+      name: "Jane Smith"
+      location: "San Francisco"
+      jobTitle: "Engineer"
+      timezone: "America/Los_Angeles"
+      dateFormat: "YYYY-MM-DD"
+      appearance: "auto"
+    ) {
+      responseResult { succeeded errorCode message }
+      jwt
+    }
+  }
+}
+```
+
+### `changePassword` — Change own password
+
+```graphql
+mutation {
+  users {
+    changePassword(current: "oldpass", new: "newpass123") {
+      responseResult { succeeded errorCode message }
+      jwt
+    }
+  }
+}
+```

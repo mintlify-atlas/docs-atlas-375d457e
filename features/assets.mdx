@@ -1,0 +1,147 @@
+---
+title: "Managing assets and file uploads in Wiki.js"
+description: "Upload images, documents, and files to Wiki.js. Organize assets in folders, embed them in pages, and control upload size and file type limits."
+---
+
+Assets are the files you upload to Wiki.js — images, PDFs, spreadsheets, and any other binary files your pages need to reference. Wiki.js stores assets separately from page content and associates each one with an asset folder. You can upload assets through the page editor's asset manager or via the administration panel, then embed them directly into page content.
+
+## Asset types
+
+Wiki.js categorizes assets into two kinds:
+
+| Kind | Description |
+|------|-------------|
+| `IMAGE` | Image files (PNG, JPEG, GIF, SVG, WebP, etc.) |
+| `BINARY` | All other file types: PDFs, Office documents, archives, and so on |
+
+You can list assets of a specific kind, or use `ALL` to retrieve everything in a folder.
+
+## Folder structure
+
+Assets are organized in folders, which you create and manage from the asset manager. Folders can be nested — each folder has a parent folder ID, and the root folder has a parent ID of `0`.
+
+Folder slugs mirror the page path convention: lowercase, hyphenated, and URL-safe. Each folder has an optional display name separate from its slug.
+
+```graphql
+# List folders under the root
+query {
+  assets {
+    folders(parentFolderId: 0) {
+      id
+      slug
+      name
+    }
+  }
+}
+```
+
+<Tip>
+  Organize your asset folders to mirror your page hierarchy. For example, assets for pages under `docs/api/` can live in an `assets/docs/api/` folder, making it easy to find related files.
+</Tip>
+
+## Uploading assets
+
+Upload assets through the **Insert Assets** panel in the page editor. The upload dialog lets you drag and drop files or select them from disk. Upload behavior is governed by settings in the administration panel under **Storage** and **Security**:
+
+- **Maximum file size** — admins set the maximum allowed size for a single uploaded file.
+- **Maximum files per upload** — admins set how many files can be uploaded in a single batch.
+- **Allowed file extensions** — only file types explicitly permitted by the admin are accepted. Uploads with disallowed extensions are rejected with an error.
+
+<Warning>
+  SVG files are scanned for embedded scripts before being stored. Malicious SVG content is rejected to prevent cross-site scripting attacks.
+</Warning>
+
+## Embedding assets in pages
+
+Once an asset is uploaded, you can insert it into any page. The exact syntax depends on your editor.
+
+**Markdown:**
+
+```markdown
+![Alt text describing the image](/path/to/image.png)
+```
+
+For non-image files, use a standard link:
+
+```markdown
+[Download the PDF](/docs/report.pdf)
+```
+
+**HTML / Visual Editor:**
+
+Use the editor's built-in Insert Image or Insert Link toolbar button. The asset picker lets you browse folders and select the file without typing the path manually.
+
+### Force download
+
+Certain file types can be configured to force a browser download rather than opening inline. This is useful for Office documents and archives that browsers might otherwise attempt to render. Contact your administrator to adjust the force-download settings for specific MIME types.
+
+## Asset permissions
+
+Asset operations are governed by three permission flags:
+
+| Permission | What it allows |
+|-----------|----------------|
+| `read:assets` | List and view assets |
+| `write:assets` | Upload new assets and create folders |
+| `manage:assets` | Rename and delete assets |
+
+Assign these permissions to user groups in the administration panel under **Groups**.
+
+## Storage backends
+
+Assets are saved to whichever storage backend is configured for your Wiki.js instance — local disk, Amazon S3, Azure Blob Storage, Google Cloud Storage, or another supported provider. The storage backend is configured under **Administration → Storage**. Asset URLs are resolved relative to your Wiki.js base URL regardless of which backend is in use.
+
+## Managing assets via the API
+
+You can manage folders and assets programmatically through the GraphQL API.
+
+**Create a folder:**
+
+```graphql
+mutation {
+  assets {
+    createFolder(
+      parentFolderId: 0
+      slug: "diagrams"
+      name: "Architecture Diagrams"
+    ) {
+      responseResult {
+        succeeded
+        message
+      }
+    }
+  }
+}
+```
+
+**Rename an asset:**
+
+```graphql
+mutation {
+  assets {
+    renameAsset(id: 17, filename: "architecture-v2.png") {
+      responseResult {
+        succeeded
+      }
+    }
+  }
+}
+```
+
+**Delete an asset:**
+
+```graphql
+mutation {
+  assets {
+    deleteAsset(id: 17) {
+      responseResult {
+        succeeded
+      }
+    }
+  }
+}
+```
+
+<Note>
+  Deleting an asset does not automatically update pages that reference it. Any pages embedding the deleted asset will display a broken image or link. Update or remove references manually before deleting.
+</Note>

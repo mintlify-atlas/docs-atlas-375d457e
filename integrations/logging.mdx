@@ -1,0 +1,145 @@
+---
+title: "Logging and Monitoring for Wiki.js"
+description: "Configure Wiki.js logging to capture errors, warnings, and activity. Route logs to console, file, or third-party services like Sentry and Loggly."
+---
+
+Wiki.js emits structured log output at runtime covering application errors, warnings, database activity, and request traces. You control how much detail is captured through the log level setting, and where logs are sent through logging providers. Multiple providers can be active simultaneously, so you can write logs to a local file and also forward them to a centralized monitoring service at the same time.
+
+## Log level
+
+Set the log level in your `config.yml` file using the `logLevel` key. Wiki.js uses the following levels, ordered from least to most verbose:
+
+| Level | Value | What is captured |
+|---|---|---|
+| `error` | Most critical | Unhandled exceptions and fatal errors only. |
+| `warn` | | Errors plus warnings about unexpected conditions. |
+| `info` | Default | Warnings plus general operational messages such as startup info and completed jobs. |
+| `verbose` | | Info plus detailed operational messages about individual operations. |
+| `debug` | | Verbose plus internal state and debugging information. |
+| `silly` | Most verbose | All output, including low-level trace messages. |
+
+```yaml config.yml
+# Possible values: error, warn, info (default), verbose, debug, silly
+logLevel: info
+```
+
+<Tip>
+  Use `info` in production. Switch to `debug` or `verbose` temporarily when diagnosing a specific issue, then revert to avoid log volume and performance overhead.
+</Tip>
+
+## Log format
+
+The `logFormat` key controls how log entries are structured:
+
+```yaml config.yml
+# Possible values: default, json
+logFormat: default
+```
+
+| Format | Description |
+|---|---|
+| `default` | Human-readable output with colorized level labels. Best for development and viewing logs directly in a terminal. |
+| `json` | One JSON object per log line. Each entry includes `level`, `message`, `timestamp`, and any additional context fields. Best for production when logs are consumed by a log aggregation system. |
+
+<Note>
+  JSON format is strongly recommended when you route logs to a third-party provider such as Logstash, Loggly, or Papertrail. Most log management platforms can parse JSON natively and will index individual fields automatically.
+</Note>
+
+## Available logging providers
+
+You can enable any combination of providers from **Administration → Logging**. Each provider has its own minimum log level setting that acts as a filter — entries below that level are not forwarded to that provider.
+
+| Provider | Key | Default level | Description |
+|---|---|---|---|
+| Log Files | `disk` | `info` | Writes log output to files on the local disk. |
+| Windows Event Log | `eventlog` | `warn` | Reports log entries to the Windows Event Log. For Windows Server deployments only. |
+| Syslog | `syslog` | `warn` | Forwards log entries to a syslog server over UDP/TCP. |
+| Sentry | `sentry` | `warn` | Error tracking service that captures exceptions with full stack traces and release context. |
+| Loggly | `loggly` | `warn` | Cloud-based log analysis and monitoring. Requires a Loggly token and subdomain. |
+| Logstash | `logstash` | `warn` | Ships logs to a Logstash instance as part of an Elastic Stack pipeline. |
+| Papertrail | `papertrail` | `warn` | Hosted log management. Requires a Papertrail host and port. |
+| New Relic | `newrelic` | `warn` | Routes logs to New Relic's digital intelligence platform. |
+| Airbrake | `airbrake` | `warn` | Exception reporting service with support for 18 languages. |
+| Bugsnag | `bugsnag` | `warn` | Application monitoring that captures errors and diagnostic data. Requires a project notifier key. |
+| Rollbar | `rollbar` | `warn` | Real-time error alerting and debugging. Requires an access key. |
+| Raygun | `raygun` | `warn` | Error, crash, and performance monitoring. |
+
+## Enabling a logging provider
+
+<Steps>
+  <Step title="Open the logging settings">
+    Navigate to **Administration → Logging** in the admin sidebar.
+  </Step>
+  <Step title="Toggle a provider on">
+    Enable each provider you want to use. Unlike analytics, multiple providers can be active at the same time.
+  </Step>
+  <Step title="Set the level for each provider">
+    Each enabled provider has its own level selector. Set the minimum severity you want forwarded to that provider. For example, you might set your local disk logger to `info` and Sentry to `warn`.
+  </Step>
+  <Step title="Enter provider credentials">
+    Providers that require credentials (Sentry DSN, Loggly token, Rollbar key, etc.) expose a configuration form when enabled. Fill in the required values.
+  </Step>
+  <Step title="Save changes">
+    Click **Apply Changes**. New log entries matching the configured level will start flowing to the enabled providers immediately.
+  </Step>
+</Steps>
+
+## Using JSON logs in production
+
+When running Wiki.js in a containerized or cloud environment, set `logFormat: json` in `config.yml` and direct stdout to your log aggregation stack. JSON lines are compatible with Fluentd, Filebeat, Logstash, AWS CloudWatch Logs Insights, Google Cloud Logging, and most other modern log pipelines without any additional parsing configuration.
+
+```yaml config.yml
+logLevel: warn
+logFormat: json
+```
+
+With JSON format, each log line looks like:
+
+```json
+{"level":"warn","message":"Failed to connect to storage target","target":"s3","timestamp":"2026-04-18T10:23:01.442Z"}
+```
+
+Individual fields are indexed by the log platform, allowing you to filter by `level`, search by `message`, and build dashboards without custom parsing rules.
+
+## Logger fields (GraphQL)
+
+You can query and update logging providers through the GraphQL API:
+
+```graphql
+query {
+  logging {
+    loggers {
+      key
+      title
+      isEnabled
+      level
+      description
+    }
+  }
+}
+```
+
+Each `Logger` object exposes:
+
+| Field | Type | Description |
+|---|---|---|
+| `key` | `String` | Unique provider identifier (e.g. `sentry`, `disk`). |
+| `title` | `String` | Display name of the provider. |
+| `isEnabled` | `Boolean` | Whether this provider is currently active. |
+| `level` | `String` | Minimum log level forwarded to this provider. |
+| `description` | `String` | Short description of the provider. |
+| `config` | `[KeyValuePair]` | Provider-specific configuration values. |
+
+Wiki.js also exposes a live log trail over GraphQL subscriptions:
+
+```graphql
+subscription {
+  loggingLiveTrail {
+    level
+    output
+    timestamp
+  }
+}
+```
+
+This subscription streams log entries in real time as they are emitted by the server, useful for live debugging from a GraphQL client.
